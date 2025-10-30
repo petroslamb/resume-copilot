@@ -35,3 +35,4 @@
 - The primary agent is `resumeAgent` in `src/mastra/agents/index.ts`; changes here should be mirrored in `README.md` so challenge reviewers understand capabilities.
 - When adding new actions or tools, document their shape in the front-end action definition and update the agent instructions to reflect expected usage.
 - Preserve graceful handling of malformed payloads—use shared utilities in `page.tsx` and extend them rather than bypassing validation.
+- The agent greets on startup and immediately summarizes its available tools (`markitdown_convert_to_markdown`, `formatResumeMarkdown`, `updateMarkdownResume`, `setThemeColor`) so users know how to engage with it.

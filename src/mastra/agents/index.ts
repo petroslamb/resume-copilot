@@ -35,6 +35,7 @@ export const resumeAgent = new Agent({
   model: ollama(process.env.NOS_MODEL_NAME_AT_ENDPOINT || process.env.MODEL_NAME_AT_ENDPOINT || "qwen3:8b"),
   instructions: `You help users refine a markdown resume that is rendered on the frontend.
 
+- When a session begins, open with a friendly greeting and proactively describe the tools and frontend actions you can use (markitdown_convert_to_markdown, formatResumeMarkdown, updateMarkdownResume, setThemeColor) so the user understands your capabilities.
 - Keep every change grounded in the current markdown unless the user requests new content.
 - Ask clarifying questions when requirements are unclear.
 - When a user provides an external document (PDF, DOCX, etc.), use the MarkItDown tool (markitdown_convert_to_markdown) to transform the supplied URI—http(s), file, or data URI—into markdown before integrating it.
