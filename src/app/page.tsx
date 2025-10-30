@@ -1,8 +1,9 @@
 "use client";
-import { ReactNode, useRef, useState } from "react";
+import { ReactNode, useCallback, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
-import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
+import { useCopilotAction, useCopilotReadable, useCoAgent } from "@copilotkit/react-core";
 import { CopilotKitCSSProperties, CopilotSidebar } from "@copilotkit/react-ui";
+import type { AgentStateType } from "@/mastra/agents/schema";
 
 const markdownResumeTemplate = `# Resume Snapshot
 
@@ -77,7 +78,28 @@ export default function CopilotKitPage() {
 }
 
 function YourMainContent({ themeColor }: { themeColor: string }) {
-  const [markdownResume, setMarkdownResume] = useState(markdownResumeTemplate);
+  const { state: agentState, setState: setAgentState } = useCoAgent<AgentStateType>({
+    name: "resumeAgent",
+    initialState: { markdownResume: markdownResumeTemplate },
+  });
+  const markdownResume = agentState?.markdownResume ?? markdownResumeTemplate;
+  const applyResumeUpdate = useCallback(
+    (nextMarkdown: string) => {
+      setAgentState((prev) => {
+        const current = prev ?? { markdownResume: markdownResumeTemplate };
+        const previousValue = typeof current.markdownResume === "string" ? current.markdownResume : "";
+        if (previousValue.trim() === nextMarkdown.trim()) {
+          return current;
+        }
+
+        return {
+          ...current,
+          markdownResume: nextMarkdown,
+        };
+      });
+    },
+    [setAgentState],
+  );
 
   useCopilotReadable(
     {
@@ -107,11 +129,7 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
 
       const sanitizedMarkdown = sanitizeMarkdownPayload(markdown);
 
-      if (sanitizedMarkdown.trim() === markdownResume.trim()) {
-        return;
-      }
-
-      setMarkdownResume(sanitizedMarkdown);
+      applyResumeUpdate(sanitizedMarkdown);
     },
   });
 
@@ -151,7 +169,7 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
         <MarkitdownImportCard
           themeColor={themeColor}
           onImport={(markdown) => {
-            setMarkdownResume(sanitizeMarkdownPayload(markdown));
+            applyResumeUpdate(sanitizeMarkdownPayload(markdown));
           }}
         />
         <p className="text-center text-sm text-white/80 max-w-2xl">
