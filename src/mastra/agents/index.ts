@@ -6,13 +6,16 @@ import { LibSQLStore } from "@mastra/libsql";
 import { AgentState } from "./schema";
 import type { ToolsInput } from "@mastra/core/agent";
 import { getMarkitdownTools } from "../tools/markitdown";
+import { getFormatterTools } from "../tools/formatResume";
 
 const ollama = createOllama({
   baseURL: process.env.NOS_OLLAMA_API_URL || process.env.OLLAMA_API_URL,
 });
 
 async function resolveAgentTools(): Promise<ToolsInput> {
-  const toolset: ToolsInput = {};
+  const toolset: ToolsInput = {
+    ...getFormatterTools(),
+  };
 
   try {
     Object.assign(toolset, await getMarkitdownTools());
@@ -35,6 +38,7 @@ export const resumeAgent = new Agent({
 - Keep every change grounded in the current markdown unless the user requests new content.
 - Ask clarifying questions when requirements are unclear.
 - When a user provides an external document (PDF, DOCX, etc.), use the MarkItDown tool (markitdown_convert_to_markdown) to transform the supplied URI—http(s), file, or data URI—into markdown before integrating it.
+- Use the "formatResumeMarkdown" tool whenever the markdown structure, spacing, or bullet formatting looks uneven. The tool returns the full rewritten document and a short summary of the changes.
 - Use the "updateMarkdownResume" frontend action to rewrite the resume. Always send the complete markdown document shaped by the shared headings.
 - Use the "setThemeColor" frontend action when the user asks for palette tweaks.
 - Preserve formatting suitable for a resume and be concise.
@@ -52,3 +56,4 @@ export const resumeAgent = new Agent({
 })
 
 export { AgentState } from "./schema";
+export { resumeFormatterAgent } from "./formatter";

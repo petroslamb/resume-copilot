@@ -85,6 +85,9 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
   const markdownResume = agentState?.markdownResume ?? markdownResumeTemplate;
   const [viewMode, setViewMode] = useState<"preview" | "edit">("preview");
   const [draftMarkdown, setDraftMarkdown] = useState(markdownResume);
+  const [isFormatting, setIsFormatting] = useState(false);
+  const [formattingStatus, setFormattingStatus] = useState<string | null>(null);
+  const [formattingError, setFormattingError] = useState<string | null>(null);
   const applyResumeUpdate = useCallback(
     (nextMarkdown: string) => {
       setAgentState((prev) => {
@@ -124,6 +127,48 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
     applyResumeUpdate(sanitizedDraft);
     setViewMode("preview");
   };
+
+  const handleImproveFormatting = useCallback(async () => {
+    if (isFormatting) {
+      return;
+    }
+
+    setIsFormatting(true);
+    setFormattingStatus(null);
+    setFormattingError(null);
+
+    try {
+      const response = await fetch("/api/format-resume", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          markdown: markdownResume,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        markdown?: string;
+        summary?: string;
+        error?: string;
+      };
+
+      if (!response.ok || typeof payload.markdown !== "string") {
+        throw new Error(payload.error || "Formatter agent returned an unexpected response.");
+      }
+
+      const sanitized = sanitizeMarkdownPayload(payload.markdown);
+      applyResumeUpdate(sanitized);
+      setDraftMarkdown(sanitized);
+      setFormattingStatus(payload.summary?.trim() || "Applied formatting improvements.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to format the resume markdown.";
+      setFormattingError(message);
+    } finally {
+      setIsFormatting(false);
+    }
+  }, [applyResumeUpdate, isFormatting, markdownResume]);
 
   useCopilotReadable(
     {
@@ -198,6 +243,10 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
           onSaveDraft={handleSaveDraft}
           onDraftChange={setDraftMarkdown}
           themeColor={themeColor}
+          onImproveFormatting={handleImproveFormatting}
+          improvingFormatting={isFormatting}
+          formattingStatus={formattingStatus}
+          formattingError={formattingError}
         />
         {viewMode === "edit" && (
           <MarkitdownImportCard
@@ -229,6 +278,10 @@ function MarkdownResumePanel({
   onEnterEditMode,
   onCancelEdit,
   onSaveDraft,
+  onImproveFormatting,
+  improvingFormatting,
+  formattingStatus,
+  formattingError,
 }: {
   markdown: string;
   themeColor: string;
@@ -238,6 +291,10 @@ function MarkdownResumePanel({
   onEnterEditMode: () => void;
   onCancelEdit: () => void;
   onSaveDraft: () => void;
+  onImproveFormatting: () => void;
+  improvingFormatting: boolean;
+  formattingStatus: string | null;
+  formattingError: string | null;
 }) {
   const previewElements = renderMarkdown(mode === "edit" ? draftMarkdown : markdown);
 
@@ -261,8 +318,31 @@ function MarkdownResumePanel({
                 : "Adjust the markdown directly. Save changes to update the live preview and share with the copilot."}
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            {mode === "edit" ? (
+          <div className="flex flex-col items-start gap-2 md:items-end">
+            {mode === "preview" && (
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={onImproveFormatting}
+                  disabled={improvingFormatting}
+                  className="rounded-full border border-white/30 px-4 py-2 text-sm font-medium text-white/80 transition-colors hover:text-white disabled:opacity-60"
+                >
+                  {improvingFormatting ? "Formatting…" : "Improve Formatting"}
+                </button>
+                <button
+                  type="button"
+                  onClick={onEnterEditMode}
+                  className="rounded-full border px-4 py-2 text-sm font-medium text-white transition-colors"
+                  style={{
+                    borderColor: themeColor,
+                    backgroundColor: themeColor,
+                  }}
+                >
+                  Edit Resume
+                </button>
+              </div>
+            )}
+            {mode === "edit" && (
               <>
                 <button
                   type="button"
@@ -283,18 +363,15 @@ function MarkdownResumePanel({
                   Cancel
                 </button>
               </>
-            ) : (
-              <button
-                type="button"
-                onClick={onEnterEditMode}
-                className="rounded-full border px-4 py-2 text-sm font-medium text-white transition-colors"
-                style={{
-                  borderColor: themeColor,
-                  backgroundColor: themeColor,
-                }}
+            )}
+            {mode === "preview" && (formattingStatus || formattingError) && (
+              <p
+                className={`text-xs ${
+                  formattingError ? "text-rose-300" : "text-emerald-300"
+                }`}
               >
-                Edit Resume
-              </button>
+                {formattingError ?? formattingStatus}
+              </p>
             )}
           </div>
         </div>

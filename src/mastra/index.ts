@@ -1,6 +1,6 @@
 import { Mastra } from "@mastra/core/mastra";
 import { LibSQLStore } from "@mastra/libsql";
-import { resumeAgent } from "./agents";
+import { resumeAgent, resumeFormatterAgent } from "./agents";
 import { ConsoleLogger, LogLevel } from "@mastra/core/logger";
 import { server } from "./mcp";
 
@@ -8,7 +8,8 @@ const LOG_LEVEL = process.env.LOG_LEVEL as LogLevel || "info";
 
 export const mastra = new Mastra({
   agents: {
-    resumeAgent
+    resumeAgent,
+    resumeFormatterAgent,
   },
   mcpServers: {
     server

@@ -84,6 +84,7 @@ yarn-error.log*
 next-env.d.ts
 
 .mastra/
+.venv-markitdown/
 
 # lock files
 package-lock.json

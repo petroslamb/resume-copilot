@@ -18,6 +18,7 @@ Key goals:
 - **Frontend (Next.js 15 + React 19)** renders the resume experience and hosts CopilotKit actions that expose targeted functions (`setThemeColor`, `updateMarkdownResume`, `renderWorkingMemoryUpdate`).
 - **CopilotKit** bridges the UI and the agent through declarative tool definitions (`useCopilotAction`) and readable streams (`useCopilotReadable`).
 - **Mastra Agent Runtime** hosts the `resumeAgent`, powered by Ollama (Nosana-hosted or local) or OpenAI. Working memory uses LibSQL in-memory storage so the agent can reason over prior resume state.
+- **Formatter Agent Tooling** exposes a dedicated `formatResumeMarkdown` tool backed by a focused agent so both the UI and copilot can request layout cleanups without touching content.
 - **MCP Server** (Mastra MCP integration) is ready for additional tools or shared context streams.
 - **Nosana Job Definition** (`nos_job_def/`) contains the manifests to push this stack onto Nosana's decentralized compute.
 
@@ -37,6 +38,7 @@ Key goals:
 - A markdown template gives the agent structured headings to expand without extra setup.
 - Theme accents can be changed interactively via Copilot commands.
 - A memory update panel shows what context the agent is storing, supporting transparency for end users.
+- An "Improve Formatting" control triggers the formatter agent to normalize spacing, lists, and headings before updating the preview.
 - A MarkItDown-powered import card lets you upload PDFs or DOCX files and instantly convert them to markdown inside the editor.
 - Layout uses a radial gradient background with a paper-like resume shell to keep focus on content quality.
 
