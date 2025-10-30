@@ -1,5 +1,5 @@
 "use client";
-import { ReactNode, useCallback, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useCopilotAction, useCopilotReadable, useCoAgent } from "@copilotkit/react-core";
 import { CopilotKitCSSProperties, CopilotSidebar } from "@copilotkit/react-ui";
@@ -83,6 +83,8 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
     initialState: { markdownResume: markdownResumeTemplate },
   });
   const markdownResume = agentState?.markdownResume ?? markdownResumeTemplate;
+  const [viewMode, setViewMode] = useState<"preview" | "edit">("preview");
+  const [draftMarkdown, setDraftMarkdown] = useState(markdownResume);
   const applyResumeUpdate = useCallback(
     (nextMarkdown: string) => {
       setAgentState((prev) => {
@@ -100,6 +102,28 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
     },
     [setAgentState],
   );
+
+  useEffect(() => {
+    if (viewMode === "preview") {
+      setDraftMarkdown(markdownResume);
+    }
+  }, [markdownResume, viewMode]);
+
+  const enterEditMode = () => {
+    setDraftMarkdown(markdownResume);
+    setViewMode("edit");
+  };
+
+  const exitEditMode = () => {
+    setDraftMarkdown(markdownResume);
+    setViewMode("preview");
+  };
+
+  const handleSaveDraft = () => {
+    const sanitizedDraft = sanitizeMarkdownPayload(draftMarkdown);
+    applyResumeUpdate(sanitizedDraft);
+    setViewMode("preview");
+  };
 
   useCopilotReadable(
     {
@@ -165,17 +189,32 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
       }}
     >
       <div className="w-full flex flex-col items-center gap-8">
-        <MarkdownResumePanel markdown={markdownResume} themeColor={themeColor} />
-        <MarkitdownImportCard
+        <MarkdownResumePanel
+          markdown={markdownResume}
+          draftMarkdown={draftMarkdown}
+          mode={viewMode}
+          onEnterEditMode={enterEditMode}
+          onCancelEdit={exitEditMode}
+          onSaveDraft={handleSaveDraft}
+          onDraftChange={setDraftMarkdown}
           themeColor={themeColor}
-          onImport={(markdown) => {
-            applyResumeUpdate(sanitizeMarkdownPayload(markdown));
-          }}
         />
-        <p className="text-center text-sm text-white/80 max-w-2xl">
-          Tip: Ask the copilot to rearrange sections, rewrite bullet points, or evolve
-          the story you want to tell.
-        </p>
+        {viewMode === "edit" && (
+          <MarkitdownImportCard
+            themeColor={themeColor}
+            onImport={(markdown) => {
+              const sanitized = sanitizeMarkdownPayload(markdown);
+              setDraftMarkdown(sanitized);
+              applyResumeUpdate(sanitized);
+            }}
+          />
+        )}
+        {viewMode === "preview" && (
+          <p className="text-center text-sm text-white/80 max-w-2xl">
+            Tip: Ask the copilot to rearrange sections, rewrite bullet points, or evolve
+            the story you want to tell.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -184,51 +223,117 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
 function MarkdownResumePanel({
   markdown,
   themeColor,
+  draftMarkdown,
+  onDraftChange,
+  mode,
+  onEnterEditMode,
+  onCancelEdit,
+  onSaveDraft,
 }: {
   markdown: string;
   themeColor: string;
+  draftMarkdown: string;
+  onDraftChange: (value: string) => void;
+  mode: "preview" | "edit";
+  onEnterEditMode: () => void;
+  onCancelEdit: () => void;
+  onSaveDraft: () => void;
 }) {
-  const previewElements = renderMarkdown(markdown);
+  const previewElements = renderMarkdown(mode === "edit" ? draftMarkdown : markdown);
 
   return (
     <section
       className="w-full max-w-5xl rounded-3xl border border-white/25 bg-white/10 text-white shadow-2xl backdrop-blur"
       style={{ borderColor: themeColor }}
     >
-      <div className="px-8 py-8 md:py-10 space-y-4">
-        <div className="flex flex-col gap-1">
-          <span className="text-xs uppercase tracking-[0.3em] text-white/60">
-            Markdown Resume
-          </span>
-          <h2 className="text-3xl font-semibold" style={{ color: themeColor }}>
-            Template View
-          </h2>
-          <p className="text-sm text-white/70">
-            Copilot can rewrite this document via the <code>updateMarkdownResume</code> action.
-            Start from the empty headings below and evolve the narrative as needed.
-          </p>
+      <div className="px-8 py-8 md:py-10 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs uppercase tracking-[0.3em] text-white/60">
+              Markdown Resume
+            </span>
+            <h2 className="text-3xl font-semibold" style={{ color: themeColor }}>
+              {mode === "preview" ? "Preview" : "Edit Mode"}
+            </h2>
+            <p className="text-sm text-white/70">
+              {mode === "preview"
+                ? "Review the rendered resume. Switch to edit mode to make direct markdown updates."
+                : "Adjust the markdown directly. Save changes to update the live preview and share with the copilot."}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {mode === "edit" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onSaveDraft}
+                  className="rounded-full border px-4 py-2 text-sm font-medium text-white transition-colors"
+                  style={{
+                    borderColor: themeColor,
+                    backgroundColor: themeColor,
+                  }}
+                >
+                  Save Changes
+                </button>
+                <button
+                  type="button"
+                  onClick={onCancelEdit}
+                  className="rounded-full border border-white/25 px-4 py-2 text-sm font-medium text-white/80 transition-colors hover:text-white"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={onEnterEditMode}
+                className="rounded-full border px-4 py-2 text-sm font-medium text-white transition-colors"
+                style={{
+                  borderColor: themeColor,
+                  backgroundColor: themeColor,
+                }}
+              >
+                Edit Resume
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <div>
-            <h3 className="text-xs uppercase tracking-[0.25em] text-white/60">Preview</h3>
-            <div className="mt-3 space-y-4 leading-relaxed">
-              {previewElements.length > 0 ? (
-                previewElements
-              ) : (
-                <p className="text-sm text-white/60 italic">No markdown content yet.</p>
-              )}
+        {mode === "preview" ? (
+          <div className="space-y-4 leading-relaxed">
+            {previewElements.length > 0 ? (
+              previewElements
+            ) : (
+              <p className="text-sm text-white/60 italic">No markdown content yet.</p>
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div>
+              <h3 className="text-xs uppercase tracking-[0.25em] text-white/60">
+                Live Preview
+              </h3>
+              <div className="mt-3 space-y-4 leading-relaxed">
+                {previewElements.length > 0 ? (
+                  previewElements
+                ) : (
+                  <p className="text-sm text-white/60 italic">No markdown content yet.</p>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <h3 className="text-xs uppercase tracking-[0.25em] text-white/60">
+                Markdown Editor
+              </h3>
+              <textarea
+                value={draftMarkdown}
+                onChange={(event) => onDraftChange(event.target.value)}
+                className="mt-3 min-h-[24rem] flex-1 rounded-2xl border border-white/20 bg-slate-950/60 p-4 text-sm font-mono text-white/90 focus:outline-none focus:ring-2"
+                style={{ borderColor: themeColor }}
+              />
             </div>
           </div>
-          <div className="flex flex-col">
-            <h3 className="text-xs uppercase tracking-[0.25em] text-white/60">
-              Markdown Source
-            </h3>
-            <pre className="mt-3 flex-1 whitespace-pre-wrap break-words rounded-2xl border border-white/15 bg-slate-950/40 p-4 text-xs font-mono text-white/80">
-              {markdown || " "}
-            </pre>
-          </div>
-        </div>
+        )}
       </div>
     </section>
   );
