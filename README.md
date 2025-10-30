@@ -9,16 +9,15 @@ This repository is our submission for **Builders' Challenge #3: AI Agents 102** 
 The Resume Copilot pairs a conversational agent with a live resume canvas. Users can ask for content rewrites, highlight tweaks, or visual adjustments, and see the rendered resume update instantly. The agent focuses on preserving structured data, avoiding malformed updates, and providing actionable feedback.
 
 Key goals:
-- Support structured resume editing with validation and graceful recovery from malformed payloads.
+- Support markdown resume editing with a responsive live preview.
 - Provide a polished UI that mirrors how the resume will look when exported or shared.
 - Keep the deployment ready for Nosana's GPU-backed, containerized environment.
 
 ## Architecture Overview
 
-- **Frontend (Next.js 15 + React 19)** renders the resume experience and hosts CopilotKit actions that expose targeted functions (`setThemeColor`, `updateResume`, `renderWorkingMemoryUpdate`).
-- **CopilotKit** bridges the UI and the agent, wiring communications through shared state (`useCoAgent`) and declarative tool definitions (`useCopilotAction`).
+- **Frontend (Next.js 15 + React 19)** renders the resume experience and hosts CopilotKit actions that expose targeted functions (`setThemeColor`, `updateMarkdownResume`, `renderWorkingMemoryUpdate`).
+- **CopilotKit** bridges the UI and the agent through declarative tool definitions (`useCopilotAction`) and readable streams (`useCopilotReadable`).
 - **Mastra Agent Runtime** hosts the `resumeAgent`, powered by Ollama (Nosana-hosted or local) or OpenAI. Working memory uses LibSQL in-memory storage so the agent can reason over prior resume state.
-- **JSON Repair & Validation** (`jsonrepair`, `zod`) ensure malformed updates from the LLM are repaired, validated, and merged safely before touching UI state.
 - **MCP Server** (Mastra MCP integration) is ready for additional tools or shared context streams.
 - **Nosana Job Definition** (`nos_job_def/`) contains the manifests to push this stack onto Nosana's decentralized compute.
 
@@ -30,14 +29,15 @@ Key goals:
 - Mastra `@mastra/core`, `@mastra/memory`, and LibSQL storage
 - CopilotKit UI and runtime bindings
 - Ollama AI provider (default: Nosana-hosted Qwen3:8b) with optional OpenAI
-- `jsonrepair` and `zod` for resilient payload handling
+- `zod` for lightweight schema validation on agent working memory
 - Docker for containerization and Nosana deployment
 
 ## Frontend Experience
 
-- Default resume data seeds a rich layout that highlights the agent's edits immediately.
+- A markdown template gives the agent structured headings to expand without extra setup.
 - Theme accents can be changed interactively via Copilot commands.
 - A memory update panel shows what context the agent is storing, supporting transparency for end users.
+- A MarkItDown-powered import card lets you upload PDFs or DOCX files and instantly convert them to markdown inside the editor.
 - Layout uses a radial gradient background with a paper-like resume shell to keep focus on content quality.
 
 ## Repository Layout
@@ -105,6 +105,29 @@ Visit `http://localhost:3000` to chat with the Resume Copilot. The Mastra playgr
 - `pnpm run start` – Start both services from the production build (uses `concurrently` under the hood).
 - `pnpm run build:agent` / `pnpm run start:agent` – Mastra-only workflow.
 - `pnpm run build:ui` / `pnpm run start:ui` – Next.js-only workflow.
+
+## MarkItDown MCP Integration
+
+The agent exposes the remote `markitdown_convert_to_markdown` MCP tool so it can ingest PDFs, DOCX files, and other supported formats. The frontend includes an “Import a resume with MarkItDown” card that uploads a document, calls the tool, and swaps the editor content with the converted markdown.
+
+### Quick start
+
+1. Install the MCP server: `pip install markitdown-mcp`
+2. Start it in HTTP mode: `markitdown-mcp --http --host 127.0.0.1 --port 3001`
+3. Point the app at the server (optional—defaults to the value below):
+   ```bash
+   export MARKITDOWN_MCP_URL=http://127.0.0.1:3001/mcp
+   ```
+4. Run the agent/UI as usual (`pnpm run dev:agent` + `pnpm run dev:ui`) and use the upload card to import a document.
+
+### Configuration
+
+- `MARKITDOWN_MCP_URL` – Streamable HTTP endpoint for the MarkItDown MCP server. Defaults to `http://127.0.0.1:3001/mcp`.
+- `MARKITDOWN_MCP_HEADERS` – Optional JSON object of additional request headers (e.g. API keys).
+- `MARKITDOWN_MCP_TIMEOUT` – Override per-call timeout (milliseconds, default `120000`).
+- `MARKITDOWN_MAX_UPLOAD_BYTES` – Limit for file uploads handled by `/api/markitdown` (default 5 MB).
+
+If the tool cannot be reached, the agent starts without it and logs a warning so you can correct the configuration.
 
 ## Containerization & Deployment
 

@@ -4,21 +4,39 @@ import { createOllama } from "ollama-ai-provider-v2";
 import { Memory } from "@mastra/memory";
 import { LibSQLStore } from "@mastra/libsql";
 import { AgentState } from "./schema";
+import type { ToolsInput } from "@mastra/core/agent";
+import { getMarkitdownTools } from "../tools/markitdown";
 
 const ollama = createOllama({
   baseURL: process.env.NOS_OLLAMA_API_URL || process.env.OLLAMA_API_URL,
 });
 
+async function resolveAgentTools(): Promise<ToolsInput> {
+  const toolset: ToolsInput = {};
+
+  try {
+    Object.assign(toolset, await getMarkitdownTools());
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown error while loading MarkItDown tools.";
+    console.warn(`[markitdown] Falling back to no-op toolset: ${message}`);
+  }
+
+  return toolset;
+}
+
 export const resumeAgent = new Agent({
   name: "Resume Editor",
-  tools: {},
+  tools: resolveAgentTools,
   // model: openai("gpt-4o"), // Uncomment to use OpenAI
   model: ollama(process.env.NOS_MODEL_NAME_AT_ENDPOINT || process.env.MODEL_NAME_AT_ENDPOINT || "qwen3:8b"),
-  instructions: `You help users refine a resume that is rendered on the frontend.
+  instructions: `You help users refine a markdown resume that is rendered on the frontend.
 
-- Keep every change grounded in the existing resume data unless the user requests something new.
+- Keep every change grounded in the current markdown unless the user requests new content.
 - Ask clarifying questions when requirements are unclear.
-- Use the "updateResume" frontend action to apply edits. Provide the specific resume fields you want to merge into the current state. When modifying list-based sections (experience, education, projects, skills), send the entire updated array.
+- When a user provides an external document (PDF, DOCX, etc.), use the MarkItDown tool (markitdown_convert_to_markdown) to transform the supplied URI—http(s), file, or data URI—into markdown before integrating it.
+- Use the "updateMarkdownResume" frontend action to rewrite the resume. Always send the complete markdown document shaped by the shared headings.
+- Use the "setThemeColor" frontend action when the user asks for palette tweaks.
 - Preserve formatting suitable for a resume and be concise.
 - Confirm meaningful changes after applying them.`,
   description: "An agent that collaborates on resume content and formatting.",
@@ -33,4 +51,4 @@ export const resumeAgent = new Agent({
   }),
 })
 
-export { AgentState, ResumeSchema } from "./schema";
+export { AgentState } from "./schema";
