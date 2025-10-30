@@ -1,307 +1,136 @@
-# Builders' Challenge #3: AI Agents 102
-**Presented by Nosana and Mastra**
+# Builders' Challenge #3: AI Agents 102 – Resume Copilot
 
 ![Agent](./assets/NosanaBuildersChallenge03.jpg)
 
-## Welcome to the AI Agent Challenge
+This repository is our submission for **Builders' Challenge #3: AI Agents 102** by Nosana and Mastra. The brief is to ship a production-ready AI agent, deploy it on Nosana's decentralized compute network, and showcase the experience. We are building an intelligent **Resume Copilot** that helps users refactor and iterate on their professional story in real time.
 
-Build and deploy intelligent AI agents using the **Mastra framework** on the **Nosana decentralized compute network**. Whether you're a beginner or an experienced developer, this challenge has something for everyone!
+## Project Concept
 
-## 🎯 Challenge Overview
+The Resume Copilot pairs a conversational agent with a live resume canvas. Users can ask for content rewrites, highlight tweaks, or visual adjustments, and see the rendered resume update instantly. The agent focuses on preserving structured data, avoiding malformed updates, and providing actionable feedback.
 
-**Your Mission:** Build an intelligent AI agent with a frontend interface and deploy it on Nosana's decentralized network.
+Key goals:
+- Support structured resume editing with validation and graceful recovery from malformed payloads.
+- Provide a polished UI that mirrors how the resume will look when exported or shared.
+- Keep the deployment ready for Nosana's GPU-backed, containerized environment.
 
-### What You'll Build
+## Architecture Overview
 
-Create an AI agent that performs real-world tasks using:
-- **Mastra framework** for agent orchestration
-- **Tool calling** to interact with external services
-- **MCP (Model Context Protocol)** for enhanced capabilities
-- **Custom frontend** to showcase your agent's functionality
+- **Frontend (Next.js 15 + React 19)** renders the resume experience and hosts CopilotKit actions that expose targeted functions (`setThemeColor`, `updateResume`, `renderWorkingMemoryUpdate`).
+- **CopilotKit** bridges the UI and the agent, wiring communications through shared state (`useCoAgent`) and declarative tool definitions (`useCopilotAction`).
+- **Mastra Agent Runtime** hosts the `resumeAgent`, powered by Ollama (Nosana-hosted or local) or OpenAI. Working memory uses LibSQL in-memory storage so the agent can reason over prior resume state.
+- **JSON Repair & Validation** (`jsonrepair`, `zod`) ensure malformed updates from the LLM are repaired, validated, and merged safely before touching UI state.
+- **MCP Server** (Mastra MCP integration) is ready for additional tools or shared context streams.
+- **Nosana Job Definition** (`nos_job_def/`) contains the manifests to push this stack onto Nosana's decentralized compute.
 
-### Agent Ideas & Examples
+## Technology Stack
 
-The possibilities are endless! Here are some ideas to get you started:
+- Next.js 15 with the App Router and Turbopack dev server
+- React 19 with functional components and hooks
+- Tailwind-inspired utility classes for styling
+- Mastra `@mastra/core`, `@mastra/memory`, and LibSQL storage
+- CopilotKit UI and runtime bindings
+- Ollama AI provider (default: Nosana-hosted Qwen3:8b) with optional OpenAI
+- `jsonrepair` and `zod` for resilient payload handling
+- Docker for containerization and Nosana deployment
 
-- 🤖 **Personal Assistant** - Schedule management, email drafting, task automation
-- 📊 **Data Analyst Agent** - Fetch financial data, generate insights, create visualizations
-- 🌐 **Web Researcher** - Aggregate information from multiple sources, summarize findings
-- 🛠️ **DevOps Helper** - Monitor services, automate deployments, manage infrastructure
-- 🎨 **Content Creator** - Generate social media posts, blog outlines, marketing copy
-- 🔍 **Smart Search** - Multi-source search with AI-powered result synthesis
-- 💬 **Customer Support Bot** - Answer FAQs, ticket routing, knowledge base queries
+## Frontend Experience
 
-**Be Creative!** The best agents solve real problems in innovative ways.
+- Default resume data seeds a rich layout that highlights the agent's edits immediately.
+- Theme accents can be changed interactively via Copilot commands.
+- A memory update panel shows what context the agent is storing, supporting transparency for end users.
+- Layout uses a radial gradient background with a paper-like resume shell to keep focus on content quality.
 
-## Getting Started Template
+## Repository Layout
 
-This is a starter template for building AI agents using [Mastra](https://mastra.ai) and [CopilotKit](https://copilotkit.ai). It provides a modern Next.js application with integrated AI capabilities and a beautiful UI.
+```text
+.
+├── src
+│   ├── app
+│   │   ├── api/copilotkit   # CopilotKit endpoint for streaming updates
+│   │   ├── globals.css      # Global styles and Tailwind reset
+│   │   ├── layout.tsx       # Next.js root layout
+│   │   └── page.tsx         # Resume Copilot UI and CopilotKit bindings
+│   └── mastra
+│       ├── agents           # Mastra agent definition and zod schemas
+│       ├── mcp              # MCP server bootstrap (extensible tool surface)
+│       └── tools            # Placeholder for future tool implementations
+├── nos_job_def              # Job definitions for Nosana deployment
+├── Dockerfile               # Single container running agent + UI
+├── logs                     # Dev logs for agent and UI processes
+└── package.json             # Scripts for dev, build, and deployment
+```
 
-## Getting Started
+## Prerequisites
 
-### Prerequisites & Registration
+- Node.js 20+ (tested with the version shipped by Nosana’s starter)
+- [pnpm](https://pnpm.io/) or npm (scripts assume pnpm, adjust if needed)
+- Docker (for the deployment stage)
+- Optional: [Ollama](https://ollama.com/download) for local model experimentation
+- Optional: OpenAI API key if you prefer OpenAI models during development
 
-To participate in the challenge and get Nosana credits/NOS tokens, complete these steps:
-
-1. Register at [SuperTeam](https://earn.superteam.fun/listing/nosana-builders-challenge-agents-102)
-2. Register at the [Luma Page](https://luma.com/zkob1iae)
-3. Star these repos:
-   - [this repo](https://github.com/nosana-ci/agent-challenge)
-   - [Nosana CLI](https://github.com/nosana-ci/nosana-cli)
-   - [Nosana SDK](https://github.com/nosana-ci/nosana-sdk)
-4. Complete [this registration form](https://e86f0b9c.sibforms.com/serve/MUIFALaEjtsXB60SDmm1_DHdt9TOSRCFHOZUSvwK0ANbZDeJH-sBZry2_0YTNi1OjPt_ZNiwr4gGC1DPTji2zdKGJos1QEyVGBzTq_oLalKkeHx3tq2tQtzghyIhYoF4_sFmej1YL1WtnFQyH0y1epowKmDFpDz_EdGKH2cYKTleuTu97viowkIIMqoDgMqTD0uBaZNGwjjsM07T)
-
-### Setup Your Development Environment
-
-#### **Step 1: Fork, Clone and Quickstart**
+## Installation
 
 ```bash
-# Fork this repo on GitHub, then clone your fork
-git clone https://github.com/YOUR-USERNAME/agent-challenge
-
+git clone https://github.com/YOUR-USERNAME/agent-challenge.git
 cd agent-challenge
-
-cp .env.example .env
-
-pnpm i
-
-pnpm run dev:ui      # Start UI server (port 3000)
-pnpm run dev:agent   # Start Mastra agent server (port 4111)
+cp .env.example .env     # set NOS_OLLAMA_API_URL / MODEL_NAME_AT_ENDPOINT / etc.
+pnpm install
 ```
 
-Open <http://localhost:3000> to see your agent in action in the frontend.
-Open <http://localhost:4111> to open up the Mastra Agent Playground.
+Update `.env` with one of the following:
+- **Nosana-hosted LLM (recommended):**
+  - `NOS_OLLAMA_API_URL` from the challenge brief (endpoint already appends `/api`).
+  - `NOS_MODEL_NAME_AT_ENDPOINT=qwen3:8b`
+- **Local Ollama:** run `ollama serve`, set `OLLAMA_API_URL=http://127.0.0.1:11434/api`, and pick a model name (e.g. `MODEL_NAME_AT_ENDPOINT=qwen3:0.6b`).
+- **OpenAI:** set `OPENAI_API_KEY`, switch the agent model in `src/mastra/agents/index.ts`.
 
-#### **Step 2: Choose Your LLM for Development (Optional)**
+## Running Locally
 
-Pick one option below to power your agent during development:
-
-##### Option A: Use Shared Nosana LLM Endpoint (Recommended - No Setup!)
-
-We provide a free LLM endpoint hosted on Nosana for development. Edit your `.env`:
-
-```env
-# Qwen3:8b - Nosana Endpoint
-# Note baseURL for Ollama needs to be appended with `/api`
-OLLAMA_API_URL=https://3yt39qx97wc9hqwwmylrphi4jsxrngjzxnjakkybnxbw.node.k8s.prd.nos.ci/api
-MODEL_NAME_AT_ENDPOINT=qwen3:8b
-```
-
-If it goes down, reach out on [Discord](https://discord.com/channels/236263424676331521/1354391113028337664)
-
-##### Option B: Use Local LLM
-
-Run Ollama locally (requires [Ollama installed](https://ollama.com/download)):
+Open two terminals (or use a process manager such as `concurrently`):
 
 ```bash
-ollama pull qwen3:0.6b
-ollama serve
+# Terminal 1 – Mastra agent runtime (port 4111 by default)
+pnpm run dev:agent
+
+# Terminal 2 – Next.js frontend (http://localhost:3000)
+pnpm run dev:ui
 ```
 
-Edit your `.env`:
-```env
-OLLAMA_API_URL=http://127.0.0.1:11434/api
-MODEL_NAME_AT_ENDPOINT=qwen3:0.6b
-```
+Visit `http://localhost:3000` to chat with the Resume Copilot. The Mastra playground remains available at `http://localhost:4111`.
 
-##### Option C: Use OpenAI
+### Useful Scripts
 
-Add to your `.env` and uncomment the OpenAI line in `src/mastra/agents/index.ts`:
+- `pnpm run lint` – Lint the codebase.
+- `pnpm run build` – Build both the agent and the UI.
+- `pnpm run start` – Start both services from the production build (uses `concurrently` under the hood).
+- `pnpm run build:agent` / `pnpm run start:agent` – Mastra-only workflow.
+- `pnpm run build:ui` / `pnpm run start:ui` – Next.js-only workflow.
 
-```env
-OPENAI_API_KEY=your-key-here
-```
-
-## 🏗️ Implementation Timeline
-
-**Important Dates:**
-- Start Challenge: 10 October
-- Submission Deadline: 31 October
-- Winners Announced: 07 October
-
-### Phase 1: Development
-
-1. **Setup** : Fork repo, install dependencies, choose template
-2. **Build** : Implement your tool functions and agent logic
-3. **Test** : Validate functionality at http://localhost:3000
-
-### Phase 2: Containerization
-
-1. **Clean up**: Remove unused agents from `src/mastra/index.ts`
-2. **Build**: Create Docker container using the provided `Dockerfile`
-3. **Test locally**: Verify container works correctly
+## Containerization & Deployment
 
 ```bash
-# Build your container (using the provided Dockerfile)
+# Build the production image
 docker build -t yourusername/agent-challenge:latest .
 
-# Test locally first
-docker run -p 3000:3000 yourusername/agent-challenge:latest 
+# Smoke-test locally
+docker run -p 3000:3000 yourusername/agent-challenge:latest
 
-# Push to Docker Hub
+# Push to your registry of choice
 docker login
 docker push yourusername/agent-challenge:latest
 ```
 
-### Phase 3: Deployment to Nosana
-1. **Deploy your complete stack**: The provided `Dockerfile` will deploy:
-   - Your Mastra agent
-   - Your frontend interface
-   - An LLM to power your agent (all in one container!)
-2. **Verify**: Test your deployed agent on Nosana network
-3. **Capture proof**: Screenshot or get deployment URL for submission
+The Dockerfile runs the Mastra agent and Next.js UI inside a single container, mirroring the environment expected by Nosana job definitions (`nos_job_def/`).
 
-### Phase 4: Video Demo
+## Submitting to the Challenge
 
-Record a 1-3 minute video demonstrating:
-- Your agent **running on Nosana** (show the deployed version!)
-- Key features and functionality
-- The frontend interface in action
-- Real-world use case demonstration
-- Upload to YouTube, Loom, or similar platform
+1. **Register** for the Builders' Challenge via [SuperTeam](https://earn.superteam.fun/listing/nosana-builders-challenge-agents-102) and the [Luma page](https://luma.com/zkob1iae).
+2. **Star** the required repositories (agent-challenge starter, Nosana CLI, Nosana SDK).
+3. **Build & Tag** your Docker image and push it to Docker Hub (or another container registry supported by Nosana).
+4. **Deploy on Nosana:** use the job definitions in `nos_job_def/` or your custom workflow to run the image on Nosana's decentralized network.
+5. **Verify the deployment:** capture the live URL or a short screen recording showing the deployed Resume Copilot in action.
+6. **Demo video (1–3 minutes):** highlight the agent’s capabilities, the frontend UX, and the deployment running on Nosana infrastructure.
+7. **Submit your proof:** follow the challenge submission form to provide links to the repository, container image, deployment evidence, and demo video.
 
-### Phase 5: Documentation
-
-Update this README with:
-- Agent description and purpose
-- What tools/APIs your agent uses
-- Setup instructions
-- Environment variables required
-- Example usage and screenshots
-
-## ✅ Minimum Requirements
-
-Your submission **must** include:
-
-- [ ] **Agent with Tool Calling** - At least one custom tool/function
-- [ ] **Frontend Interface** - Working UI to interact with your agent
-- [ ] **Deployed on Nosana** - Complete stack running on Nosana network
-- [ ] **Docker Container** - Published to Docker Hub
-- [ ] **Video Demo** - 1-3 minute demonstration
-- [ ] **Updated README** - Clear documentation in your forked repo
-- [ ] **Social Media Post** - Share on X/BlueSky/LinkedIn with #NosanaAgentChallenge
-
-## Submission Process
-
-1. **Complete all requirements** listed above
-2. **Commit all of your changes to the `main` branch of your forked repository**
-   - All your code changes
-   - Updated README
-   - Link to your Docker container
-   - Link to your video demo
-   - Nosana deployment proof
-3. **Social Media Post** (Required): Share your submission on X (Twitter), BlueSky, or LinkedIn
-   - Tag @nosana_ai
-   - Include a brief description of your agent
-   - Add hashtag #NosanaAgentChallenge
-4. **Finalize your submission on the [SuperTeam page](https://earn.superteam.fun/listing/nosana-builders-challenge-agents-102)**
-   - Add your forked GitHub repository link
-   - Add a link to your social media post
-   - Submissions that do not meet all requirements will not be considered
-
-## 🚀 Deploying to Nosana
-
-
-### Using Nosana Dashboard
-1. Open [Nosana Dashboard](https://dashboard.nosana.com/deploy)
-2. Click `Expand` to open the job definition editor
-3. Edit `nos_job_def/nosana_mastra.json` with your Docker image:
-   ```json
-   {
-     "image": "yourusername/agent-challenge:latest"
-   }
-   ```
-4. Copy and paste the edited job definition
-5. Select a GPU
-6. Click `Deploy`
-
-### Using Nosana CLI (Alternative)
-```bash
-npm install -g @nosana/cli
-nosana job post --file ./nos_job_def/nosana_mastra.json --market nvidia-3090 --timeout 30
-```
-
-## 🏆 Judging Criteria
-
-Submissions evaluated on 4 key areas (25% each):
-
-### 1. Innovation 🎨
-- Originality of agent concept
-- Creative use of AI capabilities
-- Unique problem-solving approach
-
-### 2. Technical Implementation 💻
-- Code quality and organization
-- Proper use of Mastra framework
-- Efficient tool implementation
-- Error handling and robustness
-
-### 3. Nosana Integration ⚡
-- Successful deployment on Nosana
-- Resource efficiency
-- Stability and performance
-- Proper containerization
-
-### 4. Real-World Impact 🌍
-- Practical use cases
-- Potential for adoption
-- Clear value proposition
-- Demonstration quality
-
-## 🎁 Prizes
-
-**Top 10 submissions will be rewarded:**
-- 🥇 1st Place: $1,000 USDC
-- 🥈 2nd Place: $750 USDC
-- 🥉 3rd Place: $450 USDC
-- 🏅 4th Place: $200 USDC
-- 🏅 5th-10th Place: $100 USDC each
-
-## 📚 Learning Resources
-
-For more information, check out the following resources:
-
-- [Nosana Documentation](https://docs.nosana.io)
-- [Mastra Documentation](https://mastra.ai/en/docs) - Learn more about Mastra and its features
-- [CopilotKit Documentation](https://docs.copilotkit.ai) - Explore CopilotKit's capabilities
-- [Next.js Documentation](https://nextjs.org/docs) - Learn about Next.js features and API
-- [Docker Documentation](https://docs.docker.com)
-- [Nosana CLI](https://github.com/nosana-ci/nosana-cli)
-- [Mastra Agents Overview](https://mastra.ai/en/docs/agents/overview)
-- [Build an AI Stock Agent Guide](https://mastra.ai/en/guides/guide/stock-agent)
-- [Mastra Tool Calling Documentation](https://mastra.ai/en/docs/agents/tools)
-
-## 🆘 Support & Community
-
-### Get Help
-- **Discord**: Join [Nosana Discord](https://nosana.com/discord) 
-- **Dedicated Channel**: [Builders Challenge Dev Chat](https://discord.com/channels/236263424676331521/1354391113028337664)
-- **Twitter**: Follow [@nosana_ai](https://x.com/nosana_ai) for live updates
-
-## 🎉 Ready to Build?
-
-1. **Fork** this repository
-2. **Build** your AI agent
-3. **Deploy** to Nosana
-4. **Present** your creation
-
-Good luck, builders! We can't wait to see the innovative AI agents you create for the Nosana ecosystem.
-
-**Happy Building!** 🚀
-
-## Stay in the Loop
-
-Want access to exclusive builder perks, early challenges, and Nosana credits?
-Subscribe to our newsletter and never miss an update.
-
-👉 [ Join the Nosana Builders Newsletter ](https://e86f0b9c.sibforms.com/serve/MUIFALaEjtsXB60SDmm1_DHdt9TOSRCFHOZUSvwK0ANbZDeJH-sBZry2_0YTNi1OjPt_ZNiwr4gGC1DPTji2zdKGJos1QEyVGBzTq_oLalKkeHx3tq2tQtzghyIhYoF4_sFmej1YL1WtnFQyH0y1epowKmDFpDz_EdGKH2cYKTleuTu97viowkIIMqoDgMqTD0uBaZNGwjjsM07T)
-
-Be the first to know about:
-- 🧠 Upcoming Builders Challenges
-- 💸 New reward opportunities
-- ⚙ Product updates and feature drops
-- 🎁 Early-bird credits and partner perks
-
-Join the Nosana builder community today — and build the future of decentralized AI.
-
-
+Need help? Reach out on the Nosana Discord (#builders-challenge) for guidance on model endpoints, deployment quirks, or additional Mastra/CopilotKit questions.
+Happy shipping! 🚀
