@@ -79,6 +79,8 @@ cp .env.example .env     # set NOS_OLLAMA_API_URL / MODEL_NAME_AT_ENDPOINT / etc
 pnpm install
 ```
 
+> The workspace whitelists Puppeteer's install script via `.npmrc`, so the first `pnpm install` will also download Chrome for Testing (v131) required by the Markdown-to-PDF MCP server.
+
 Update `.env` with one of the following:
 - **Nosana-hosted LLM (recommended):**
   - `NOS_OLLAMA_API_URL` from the challenge brief (endpoint already appends `/api`).
