@@ -6,6 +6,7 @@ RUN corepack enable
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
+ENV NEXT_PRIVATE_MAX_WORKERS=4
 
 # Disable Analytics/Telemetry
 ENV DISABLE_TELEMETRY=true
@@ -26,13 +27,27 @@ RUN --mount=type=cache,target=/pnpm/store \
 COPY package.json ./
 
 RUN --mount=type=cache,target=/pnpm/store \
-  pnpm install --frozen-lockfile --prod --offline
+  pnpm install --frozen-lockfile --offline
 
 COPY . .
 
 RUN pnpm build
 
+RUN mkdir -p .next/server/chunks && \
+  worker_src="$(find node_modules -path '*pdfjs-dist/legacy/build/pdf.worker.mjs' -print -quit)" && \
+  if [ -z "$worker_src" ]; then echo 'pdf.worker.mjs not found' >&2; exit 1; fi && \
+  cp "$worker_src" .next/server/chunks/pdf.worker.mjs
+
+RUN rm -rf .next/cache
+
+RUN pnpm prune --prod
+
 FROM node:lts AS runtime
+
+RUN corepack enable
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
 
 RUN groupadd -g 1001 appgroup && \
   useradd -u 1001 -g appgroup -m -d /app -s /bin/false appuser
@@ -42,7 +57,8 @@ WORKDIR /app
 COPY --from=build --chown=appuser:appgroup /app ./
 
 ENV NODE_ENV=production \
-  NODE_OPTIONS="--enable-source-maps"
+  NODE_OPTIONS="--enable-source-maps" \
+  NEXT_PRIVATE_MAX_WORKERS=4
 
 USER appuser
 

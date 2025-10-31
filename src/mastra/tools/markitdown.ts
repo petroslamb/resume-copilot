@@ -2,7 +2,7 @@ import { createTool } from "@mastra/core/tools";
 import { MCPClient } from "@mastra/mcp";
 import { RuntimeContext } from "@mastra/core/runtime-context";
 import type { ToolsInput } from "@mastra/core/agent";
-import type { MastraMCPServerDefinition } from "@mastra/mcp/dist/client/client";
+import type { MastraMCPServerDefinition } from "@mastra/mcp";
 import { z } from "zod";
 
 const MARKITDOWN_TOOL_ID = "markitdown_convert_to_markdown";
@@ -13,6 +13,8 @@ let markitdownClient: MCPClient | null = null;
 let markitdownToolsPromise: Promise<ToolsInput> | null = null;
 let localFallbackToolset: ToolsInput | null = null;
 let pdfParseLoader: Promise<(input: Buffer) => Promise<{ text: string }>> | null = null;
+let pdfWorkerConfigured = false;
+let pdfWorkerSrcPromise: Promise<string | null> | null = null;
 
 function parseTimeout(): number {
   const value = process.env.MARKITDOWN_MCP_TIMEOUT;
@@ -206,13 +208,14 @@ export async function convertUriToMarkdown(
       }
 
       const runtimeContext = new RuntimeContext();
-      const result = await tool.execute(
-        {
-          context: { uri },
-          runtimeContext,
-        },
-        undefined,
-      );
+      const execute = tool.execute as (
+        context: Parameters<NonNullable<typeof tool.execute>>[0],
+        options?: Parameters<NonNullable<typeof tool.execute>>[1],
+      ) => Promise<unknown>;
+      const result = await execute({
+        context: { uri },
+        runtimeContext,
+      });
 
       return extractMarkdown(result);
     } catch (error) {
@@ -247,6 +250,8 @@ export function resetMarkitdownClientForTests(): void {
   markitdownToolsPromise = null;
   localFallbackToolset = null;
   pdfParseLoader = null;
+  pdfWorkerConfigured = false;
+  pdfWorkerSrcPromise = null;
 }
 
 interface ParsedDataUri {
@@ -318,25 +323,139 @@ function normalizePdfText(text: string): string {
 
 async function loadPdfParse(): Promise<(input: Buffer) => Promise<{ text: string }>> {
   if (!pdfParseLoader) {
-    pdfParseLoader = import("pdf-parse").then((module) => {
-      const candidate =
-        typeof module === "function"
-          ? module
-          : typeof module?.default === "function"
-          ? module.default
-          : typeof (module as { pdfParse?: unknown })?.pdfParse === "function"
-          ? (module as { pdfParse: (buffer: Buffer) => Promise<{ text: string }> }).pdfParse
-          : null;
+    pdfParseLoader = import("pdf-parse").then((module: unknown) => {
+      const defaultExport =
+        typeof module === "object" && module !== null ? (module as { default?: unknown }).default : undefined;
+      const namedExport =
+        typeof module === "object" && module !== null ? (module as { pdfParse?: unknown }).pdfParse : undefined;
+      const pdfParseClass =
+        typeof module === "object" && module !== null ? (module as { PDFParse?: unknown }).PDFParse : undefined;
 
-      if (!candidate) {
-        throw new Error(
-          "Unable to load pdf-parse. Ensure the dependency exports a callable parser function.",
-        );
+      if (typeof module === "function") {
+        return module as (buffer: Buffer) => Promise<{ text: string }>;
       }
 
-      return candidate as (buffer: Buffer) => Promise<{ text: string }>;
+      if (typeof defaultExport === "function") {
+        return defaultExport as (buffer: Buffer) => Promise<{ text: string }>;
+      }
+
+      if (typeof namedExport === "function") {
+        return namedExport as (buffer: Buffer) => Promise<{ text: string }>;
+      }
+
+      if (typeof pdfParseClass === "function") {
+        return async (buffer: Buffer) => {
+          await ensurePdfWorkerConfigured(pdfParseClass as { setWorker?: (src: string) => unknown });
+
+          const Parser = pdfParseClass as new (options: { data: Buffer }) => {
+            getText: () => Promise<{ text: string }>;
+            destroy?: () => Promise<void>;
+          };
+
+          const parser = new Parser({ data: buffer });
+          try {
+            const result = await parser.getText();
+            return { text: result?.text ?? "" };
+          } finally {
+            if (typeof parser.destroy === "function") {
+              await parser.destroy();
+            }
+          }
+        };
+      }
+
+      throw new Error("Unable to load pdf-parse. Ensure the dependency exports a callable parser function.");
     });
   }
 
   return pdfParseLoader;
+}
+
+async function ensurePdfWorkerConfigured(Parser: {
+  setWorker?: (src: string) => unknown;
+}): Promise<void> {
+  if (pdfWorkerConfigured) {
+    return;
+  }
+
+  if (typeof Parser.setWorker !== "function") {
+    pdfWorkerConfigured = true;
+    return;
+  }
+
+  const workerSrc = await resolvePdfWorkerSrc();
+  if (!workerSrc) {
+    pdfWorkerConfigured = true;
+    console.warn(
+      "[markitdown] Unable to resolve pdf.js worker bundle. Local PDF fallback may fail.",
+    );
+    return;
+  }
+
+  try {
+    Parser.setWorker(workerSrc);
+  } catch (error) {
+    console.warn(
+      `[markitdown] Failed to configure pdf.js worker at ${workerSrc}. Local PDF fallback may fail.`,
+      error,
+    );
+  } finally {
+    pdfWorkerConfigured = true;
+  }
+}
+
+async function resolvePdfWorkerSrc(): Promise<string | null> {
+  if (!pdfWorkerSrcPromise) {
+    pdfWorkerSrcPromise = (async () => {
+      try {
+        const { createRequire } = await import("node:module");
+        const fs = await import("node:fs/promises");
+        const path = await import("node:path");
+        const require = createRequire(import.meta.url);
+        const moduleCandidates = [
+          "pdfjs-dist/legacy/build/pdf.worker.mjs",
+          "pdfjs-dist/legacy/build/pdf.worker.js",
+          "pdfjs-dist/build/pdf.worker.mjs",
+          "pdfjs-dist/build/pdf.worker.js",
+        ];
+
+        let source: string | null = null;
+        for (const candidate of moduleCandidates) {
+          try {
+            source = require.resolve(candidate);
+            if (source) {
+              break;
+            }
+          } catch {
+            // Ignore missing candidates.
+          }
+        }
+
+        if (!source) {
+          return null;
+        }
+
+        const destinationDir = path.resolve(process.cwd(), ".next/server/chunks");
+        const destinationPath = path.join(destinationDir, "pdf.worker.mjs");
+
+        await fs.mkdir(destinationDir, { recursive: true });
+        try {
+          await fs.access(destinationPath);
+        } catch {
+          await fs.copyFile(source, destinationPath);
+        }
+
+        return destinationPath;
+      } catch (error) {
+        console.warn(
+          "[markitdown] Failed to resolve pdf.js worker bundle via Node module loader.",
+          error,
+        );
+      }
+
+      return null;
+    })();
+  }
+
+  return pdfWorkerSrcPromise;
 }

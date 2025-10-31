@@ -2,7 +2,7 @@ import path from "node:path";
 import { promises as fs } from "node:fs";
 import crypto from "node:crypto";
 import { MCPClient } from "@mastra/mcp";
-import type { MastraMCPServerDefinition } from "@mastra/mcp/dist/client/client";
+import type { MastraMCPServerDefinition } from "@mastra/mcp";
 import { RuntimeContext } from "@mastra/core/runtime-context";
 import { createTool } from "@mastra/core/tools";
 import type { ToolsInput } from "@mastra/core/agent";
@@ -311,22 +311,23 @@ async function attemptRemotePdfGeneration(
   }
 
   const runtimeContext = new RuntimeContext();
-  const callResult = await tool.execute(
-    {
-      context: {
-        markdown: input.markdown,
-        outputFilename: desiredOutputPath,
-        paperFormat: normalized.pageSize,
-        paperOrientation: normalized.orientation,
-        paperBorder: mapMarginToBorder(normalized.margin),
-        watermark: normalized.watermark,
-        watermarkScope: normalized.watermarkScope,
-        showPageNumbers: normalized.showPageNumbers,
-      },
-      runtimeContext,
+  const execute = tool.execute as (
+    context: Parameters<NonNullable<typeof tool.execute>>[0],
+    options?: Parameters<NonNullable<typeof tool.execute>>[1],
+  ) => Promise<unknown>;
+  const callResult = await execute({
+    context: {
+      markdown: input.markdown,
+      outputFilename: desiredOutputPath,
+      paperFormat: normalized.pageSize,
+      paperOrientation: normalized.orientation,
+      paperBorder: mapMarginToBorder(normalized.margin),
+      watermark: normalized.watermark,
+      watermarkScope: normalized.watermarkScope,
+      showPageNumbers: normalized.showPageNumbers,
     },
-    undefined,
-  );
+    runtimeContext,
+  });
 
   const log = extractToolLog(callResult);
   const { path: pdfPath } = extractPdfPath(log);

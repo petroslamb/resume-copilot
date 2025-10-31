@@ -25,6 +25,7 @@
     "@mastra/libsql": "0.15.0",
     "@mastra/mcp": "^0.13.4",
     "@mastra/memory": "0.15.4",
+    "concurrently": "^9.1.2",
     "dotenv": "^17.2.3",
     "libsql": "^0.5.22",
     "mastra": "0.13.4",
@@ -41,9 +42,9 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "concurrently": "^9.1.2",
     "eslint": "^9",
     "eslint-config-next": "15.3.2",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
