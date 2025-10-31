@@ -245,59 +245,133 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
         body: JSON.stringify(requestPayload),
       });
 
-      const payload = (await response.json()) as {
-        pdfBase64?: string;
-        fileName?: string;
-        contentType?: string;
-        layout?: {
-          pageSize: PdfLayoutOptions["pageSize"];
-          margin: PdfLayoutOptions["margin"];
-          orientation: PdfLayoutOptions["orientation"];
-          showPageNumbers: boolean;
-          watermark?: string;
-          watermarkScope?: PdfLayoutOptions["watermarkScope"];
-        };
-        log?: string;
-        error?: string;
-      };
+      const payload = (await response.json()) as
+        | {
+            kind: "pdf";
+            pdfBase64: string;
+            fileName: string;
+            contentType: string;
+            byteLength: number;
+            layout?: {
+              pageSize: PdfLayoutOptions["pageSize"];
+              margin: PdfLayoutOptions["margin"];
+              orientation: PdfLayoutOptions["orientation"];
+              showPageNumbers: boolean;
+              watermark?: string;
+              watermarkScope?: PdfLayoutOptions["watermarkScope"];
+            };
+            log?: string;
+            error?: string;
+          }
+        | {
+            kind: "markdown-download";
+            markdown: string;
+            fileName: string;
+            contentType: string;
+            byteLength: number;
+            reason?: string;
+            error?: string;
+          }
+        | { error?: string };
 
-      if (!response.ok || typeof payload.pdfBase64 !== "string" || !payload.fileName) {
-        throw new Error(payload.error || "PDF generator returned an unexpected response.");
+      if (!response.ok) {
+        throw new Error(
+          (typeof payload === "object" && payload && "error" in payload && payload.error) ||
+            "PDF generator returned an unexpected response.",
+        );
       }
 
-      const binary = window.atob(payload.pdfBase64);
+      if (
+        typeof payload === "object" &&
+        payload &&
+        "kind" in payload &&
+        payload.kind === "markdown-download"
+      ) {
+        const blob = new Blob([payload.markdown], {
+          type: payload.contentType || "text/markdown",
+        });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = payload.fileName.endsWith(".md")
+          ? payload.fileName
+          : `${payload.fileName}.md`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+
+        const reason = payload.reason?.trim();
+        const sanitizedReason = reason ? reason.replace(/\.*$/g, "") : null;
+        const suffix = sanitizedReason ? ` (Fallback: ${sanitizedReason})` : "";
+        setPdfStatus(`Downloaded ${payload.fileName}${suffix}.`);
+        return;
+      }
+
+      const pdfPayload =
+        payload &&
+        typeof payload === "object" &&
+        "pdfBase64" in payload &&
+        typeof payload.pdfBase64 === "string" &&
+        "fileName" in payload &&
+        typeof payload.fileName === "string"
+          ? (payload as {
+              kind?: "pdf";
+              pdfBase64: string;
+              fileName: string;
+              contentType?: string;
+              layout?: {
+                pageSize: PdfLayoutOptions["pageSize"];
+                margin: PdfLayoutOptions["margin"];
+                orientation: PdfLayoutOptions["orientation"];
+                showPageNumbers: boolean;
+                watermark?: string;
+                watermarkScope?: PdfLayoutOptions["watermarkScope"];
+              };
+              log?: string;
+            })
+          : null;
+
+      if (!pdfPayload) {
+        throw new Error(
+          (typeof payload === "object" && payload && "error" in payload && payload.error) ||
+            "PDF generator returned an unexpected response.",
+        );
+      }
+
+      const binary = window.atob(pdfPayload.pdfBase64);
       const buffer = new Uint8Array(binary.length);
       for (let index = 0; index < binary.length; index += 1) {
         buffer[index] = binary.charCodeAt(index);
       }
 
       const blob = new Blob([buffer], {
-        type: payload.contentType || "application/pdf",
+        type: pdfPayload.contentType || "application/pdf",
       });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = payload.fileName;
+      link.download = pdfPayload.fileName;
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
 
-      const layoutSummary = payload.layout
+      const layoutSummary = pdfPayload.layout
         ? [
-            payload.layout.pageSize.toUpperCase(),
-            payload.layout.orientation === "landscape" ? "Landscape" : "Portrait",
-            `${payload.layout.margin} margin`,
-            payload.layout.showPageNumbers ? "Page numbers" : null,
-            payload.layout.watermark ? `Watermark (${payload.layout.watermarkScope})` : null,
+            pdfPayload.layout.pageSize.toUpperCase(),
+            pdfPayload.layout.orientation === "landscape" ? "Landscape" : "Portrait",
+            `${pdfPayload.layout.margin} margin`,
+            pdfPayload.layout.showPageNumbers ? "Page numbers" : null,
+            pdfPayload.layout.watermark ? `Watermark (${pdfPayload.layout.watermarkScope})` : null,
           ]
             .filter(Boolean)
             .join(" • ")
         : undefined;
       setPdfStatus(
         layoutSummary
-          ? `Downloaded ${payload.fileName} (${layoutSummary}).`
-          : `Downloaded ${payload.fileName}.`,
+          ? `Downloaded ${pdfPayload.fileName} (${layoutSummary}).`
+          : `Downloaded ${pdfPayload.fileName}.`,
       );
     } catch (error) {
       const message =

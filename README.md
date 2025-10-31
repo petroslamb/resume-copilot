@@ -112,7 +112,7 @@ Visit `http://localhost:3000` to chat with the Resume Copilot. The Mastra playgr
 
 ## MarkItDown MCP Integration
 
-The agent exposes the remote `markitdown_convert_to_markdown` MCP tool so it can ingest PDFs, DOCX files, and other supported formats. The frontend includes an “Import a resume with MarkItDown” card that uploads a document, calls the tool, and swaps the editor content with the converted markdown.
+The agent exposes the remote `markitdown_convert_to_markdown` MCP tool so it can ingest PDFs, DOCX files, and other supported formats. The frontend includes an “Import a resume with MarkItDown” card that uploads a document, calls the tool, and swaps the editor content with the converted markdown. When the MCP server is offline, PDF uploads automatically fall back to a lightweight Node parser; the formatting is simpler than the official service, but the import flow keeps working.
 
 ### Quick start
 
@@ -131,11 +131,11 @@ The agent exposes the remote `markitdown_convert_to_markdown` MCP tool so it can
 - `MARKITDOWN_MCP_TIMEOUT` – Override per-call timeout (milliseconds, default `120000`).
 - `MARKITDOWN_MAX_UPLOAD_BYTES` – Limit for file uploads handled by `/api/markitdown` (default 5 MB).
 
-If the tool cannot be reached, the agent starts without it and logs a warning so you can correct the configuration.
+If the tool cannot be reached, the agent starts without it and logs a warning so you can correct the configuration. PDF uploads still succeed thanks to the local fallback, but other formats require the MCP server.
 
 ## Markdown2PDF MCP Integration
 
-Resume PDF export now expects an HTTP-accessible Markdown2PDF MCP server. Point the app at a reachable endpoint and the agent will call the `create_pdf_from_markdown` tool; otherwise PDF generation fails fast.
+Resume PDF export now expects an HTTP-accessible Markdown2PDF MCP server. Point the app at a reachable endpoint and the agent will call the `create_pdf_from_markdown` tool; otherwise the UI offers a Markdown download fallback so the user still receives a copy of their resume.
 
 ### Quick start
 
@@ -154,7 +154,7 @@ Resume PDF export now expects an HTTP-accessible Markdown2PDF MCP server. Point 
 - `MARKDOWN2PDF_MCP_TIMEOUT` – Per-call timeout in milliseconds (default `120000`).
 - `MARKDOWN2PDF_OUTPUT_DIR` – Directory where generated PDFs are written before being streamed back. Defaults to `.cache/markdown2pdf` inside the app workspace; ensure the MCP server can write to and read from the same path.
 
-If the MCP endpoint is unreachable, the tool throws a descriptive error and the agent surfaces a PDF-generation failure to the UI.
+If the MCP endpoint is unreachable, the tool returns the markdown content alongside a warning so the UI can prompt the user to download a `.md` copy instead of failing the workflow.
 
 ## Containerization & Deployment
 

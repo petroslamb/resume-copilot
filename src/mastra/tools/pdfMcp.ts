@@ -46,24 +46,51 @@ export const GenerateResumePdfInputSchema = z.object({
     .describe("Optional filename for the generated PDF."),
 });
 
-export const GenerateResumePdfResultSchema = z.object({
-  pdfBase64: z.string().describe("Base64-encoded PDF payload."),
-  fileName: z.string().describe("Resolved filename for the PDF."),
-  contentType: z.literal("application/pdf"),
-  byteLength: z.number().describe("Size of the encoded PDF in bytes."),
-  layout: z.object({
-    pageSize: PageSizeEnum,
-    margin: MarginEnum,
-    orientation: OrientationEnum,
-    showPageNumbers: z.boolean(),
-    watermark: z.string().optional(),
-    watermarkScope: WatermarkScopeEnum.optional(),
-  }),
-  log: z.string().optional(),
+const GenerateResumePdfSuccessSchema = z
+  .object({
+    pdfBase64: z.string().describe("Base64-encoded PDF payload."),
+    fileName: z.string().describe("Resolved filename for the PDF."),
+    contentType: z.literal("application/pdf"),
+    byteLength: z.number().describe("Size of the encoded PDF in bytes."),
+    layout: z.object({
+      pageSize: PageSizeEnum,
+      margin: MarginEnum,
+      orientation: OrientationEnum,
+      showPageNumbers: z.boolean(),
+      watermark: z.string().optional(),
+      watermarkScope: WatermarkScopeEnum.optional(),
+    }),
+    log: z.string().optional(),
+  })
+  .extend({
+    kind: z.literal("pdf"),
+  });
+
+const GenerateResumePdfFallbackSchema = z.object({
+  kind: z.literal("markdown-download"),
+  markdown: z
+    .string()
+    .describe("Original markdown returned so the caller can offer a Markdown download fallback."),
+  fileName: z.string().describe("Filename to use for the fallback download (typically .md)."),
+  contentType: z.literal("text/markdown"),
+  byteLength: z
+    .number()
+    .describe("Size of the markdown content in bytes, useful for UI progress indicators."),
+  reason: z
+    .string()
+    .optional()
+    .describe("Optional message describing why the fallback path was used."),
 });
+
+export const GenerateResumePdfResultSchema = z.discriminatedUnion("kind", [
+  GenerateResumePdfSuccessSchema,
+  GenerateResumePdfFallbackSchema,
+]);
 
 export type GenerateResumePdfInput = z.infer<typeof GenerateResumePdfInputSchema>;
 export type GenerateResumePdfResult = z.infer<typeof GenerateResumePdfResultSchema>;
+export type GenerateResumePdfSuccessResult = z.infer<typeof GenerateResumePdfSuccessSchema>;
+export type GenerateResumePdfFallbackResult = z.infer<typeof GenerateResumePdfFallbackSchema>;
 
 type PageSize = z.infer<typeof PageSizeEnum>;
 type Margin = z.infer<typeof MarginEnum>;
@@ -250,8 +277,28 @@ function extractPdfPath(log: string): { path: string; log: string } {
   );
 }
 
-async function invokePdfTool(input: GenerateResumePdfInput): Promise<GenerateResumePdfResult> {
+async function invokePdfTool(
+  input: GenerateResumePdfInput,
+): Promise<GenerateResumePdfResult> {
   const normalized = normalizeInput(input);
+
+  try {
+    return await attemptRemotePdfGeneration(input, normalized);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown error during Markdown2PDF conversion.";
+    console.warn(
+      `[markdown2pdf] Remote conversion failed. Returning markdown download fallback. Reason: ${message}`,
+      error,
+    );
+    return buildMarkdownDownloadFallback(input, normalized, message);
+  }
+}
+
+async function attemptRemotePdfGeneration(
+  input: GenerateResumePdfInput,
+  normalized: NormalizedOptions,
+): Promise<GenerateResumePdfSuccessResult> {
   const outputDir = await ensureOutputDirectory();
   const desiredOutputPath = path.join(outputDir, normalized.fileName);
   const tools = await ensureTools();
@@ -297,6 +344,7 @@ async function invokePdfTool(input: GenerateResumePdfInput): Promise<GenerateRes
   }
 
   return {
+    kind: "pdf",
     pdfBase64: buffer.toString("base64"),
     fileName: normalized.fileName,
     contentType: "application/pdf",
@@ -311,6 +359,32 @@ async function invokePdfTool(input: GenerateResumePdfInput): Promise<GenerateRes
     },
     log,
   };
+}
+
+function buildMarkdownDownloadFallback(
+  input: GenerateResumePdfInput,
+  normalized: NormalizedOptions,
+  reason: string,
+): GenerateResumePdfFallbackResult {
+  const fallbackFileName = ensureMarkdownExtension(normalized.fileName);
+  return {
+    kind: "markdown-download",
+    markdown: input.markdown,
+    fileName: fallbackFileName,
+    contentType: "text/markdown",
+    byteLength: Buffer.byteLength(input.markdown, "utf8"),
+    reason: reason || undefined,
+  };
+}
+
+function ensureMarkdownExtension(candidate: string): string {
+  const withoutPdf = candidate.replace(/\.pdf$/i, "");
+  const trimmed = withoutPdf.trim();
+  if (!trimmed) {
+    return "resume.md";
+  }
+
+  return trimmed.toLowerCase().endsWith(".md") ? trimmed : `${trimmed}.md`;
 }
 
 function extractToolLog(callResult: unknown): string {
@@ -340,7 +414,7 @@ function extractToolLog(callResult: unknown): string {
 export const generateResumePdfTool = createTool({
   id: "generateResumePdf",
   description:
-    "Render the resume markdown into a PDF via an external Markdown2PDF MCP server. Adjust page size, margins, orientation, page numbers, and optional watermarking.",
+    "Render the resume markdown into a PDF via an external Markdown2PDF MCP server. When the server is unavailable, fall back to returning the markdown so the caller can offer a direct download instead.",
   inputSchema: GenerateResumePdfInputSchema,
   outputSchema: GenerateResumePdfResultSchema,
   execute: async ({ context }) => {
