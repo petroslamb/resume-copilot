@@ -55,7 +55,7 @@ Key goals:
 │   └── mastra
 │       ├── agents           # Mastra agent definition and zod schemas
 │       ├── mcp              # MCP server bootstrap (extensible tool surface)
-│       └── tools            # Placeholder for future tool implementations
+│       └── tools            # MarkItDown fallback, formatter, and Markdown2PDF integrations
 ├── nos_job_def              # Job definitions for Nosana deployment
 ├── Dockerfile               # Single container running agent + UI
 ├── logs                     # Dev logs for agent and UI processes
@@ -86,11 +86,16 @@ Update `.env` with one of the following:
   - `NOS_OLLAMA_API_URL` from the challenge brief (endpoint already appends `/api`).
   - `NOS_MODEL_NAME_AT_ENDPOINT=qwen3:8b`
 - **Local Ollama:** run `ollama serve`, set `OLLAMA_API_URL=http://127.0.0.1:11434/api`, and pick a model name (e.g. `MODEL_NAME_AT_ENDPOINT=qwen3:0.6b`).
-- **OpenAI:** set `OPENAI_API_KEY`, switch the agent model in `src/mastra/agents/index.ts`.
+- **OpenAI:** `pnpm add @ai-sdk/openai`, set `OPENAI_API_KEY`, and update the agent model in `src/mastra/agents/index.ts`.
 
 ## Running Locally
 
-Open two terminals (or use a process manager such as `concurrently`):
+Use the combined dev script or run each service separately:
+
+```bash
+# Start agent + UI together (http://localhost:3000 + 4111)
+pnpm run dev
+```
 
 ```bash
 # Terminal 1 – Mastra agent runtime (port 4111 by default)
@@ -104,6 +109,7 @@ Visit `http://localhost:3000` to chat with the Resume Copilot. The Mastra playgr
 
 ### Useful Scripts
 
+- `pnpm run dev` – Start the Mastra agent and Next.js UI together.
 - `pnpm run lint` – Lint the codebase.
 - `pnpm run build` – Build both the agent and the UI.
 - `pnpm run start` – Start both services from the production build (uses `concurrently` under the hood).
@@ -122,7 +128,7 @@ The agent exposes the remote `markitdown_convert_to_markdown` MCP tool so it can
    ```bash
    export MARKITDOWN_MCP_URL=http://127.0.0.1:3001/mcp
    ```
-4. Run the agent/UI as usual (`pnpm run dev:agent` + `pnpm run dev:ui`) and use the upload card to import a document.
+4. Run the agent/UI as usual (`pnpm run dev` or `pnpm run dev:agent` + `pnpm run dev:ui`) and use the upload card to import a document.
 
 ### Configuration
 

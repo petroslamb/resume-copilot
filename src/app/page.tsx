@@ -850,7 +850,7 @@ function MarkitdownImportCard({
           <p className="text-white font-semibold">Import a resume with MarkItDown</p>
           <p className="text-sm text-white/80">
             Upload a PDF or DOCX to convert it into markdown using the MarkItDown MCP server.
-            The converted text replaces the editor content so you can continue refining it with the copilot.
+            When the service is offline, PDF uploads fall back to a bundled parser so the import keeps working, while other formats still require the remote server.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -880,7 +880,7 @@ function MarkitdownImportCard({
         {errorMessage && <p className="text-rose-300">{errorMessage}</p>}
         {!statusMessage && !errorMessage && (
           <p className="text-white/60">
-            Ensure the MarkItDown MCP server is reachable (set <code>MARKITDOWN_MCP_URL</code>) before uploading.
+            Ensure the MarkItDown MCP server is reachable (set <code>MARKITDOWN_MCP_URL</code>) for DOCX and other rich formats; PDF uploads fall back to the bundled parser when the service is offline.
           </p>
         )}
       </div>

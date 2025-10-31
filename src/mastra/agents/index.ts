@@ -33,7 +33,6 @@ async function resolveAgentTools(): Promise<ToolsInput> {
 export const resumeAgent = new Agent({
   name: "Resume Editor",
   tools: resolveAgentTools,
-  // model: openai("gpt-4o"), // Uncomment to use OpenAI
   model: ollama(process.env.NOS_MODEL_NAME_AT_ENDPOINT || process.env.MODEL_NAME_AT_ENDPOINT || "qwen3:8b"),
   instructions: `You help users refine a markdown resume that is rendered on the frontend.
 
