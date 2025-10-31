@@ -11,15 +11,7 @@ import { z } from "zod";
 const PDF_MCP_TOOL_ID = "create_pdf_from_markdown";
 const DEFAULT_TIMEOUT = 120_000;
 const DEFAULT_OUTPUT_DIR = path.join(process.cwd(), ".cache", "markdown2pdf");
-const DEFAULT_WRAPPER_SCRIPT = path.resolve(
-  process.cwd(),
-  "scripts",
-  "start-markdown2pdf-mcp.mjs",
-);
-const DEFAULT_COMMAND = process.execPath;
-const DEFAULT_COMMAND_ARGS = [DEFAULT_WRAPPER_SCRIPT];
-const FALLBACK_COMMAND = "npx";
-const FALLBACK_ARGS = ["-y", "markdown2pdf-mcp@latest"];
+const DEFAULT_MARKDOWN2PDF_URL = "http://127.0.0.1:3002/mcp";
 
 const PageSizeEnum = z.enum(["letter", "a4", "a3", "a5", "legal", "tabloid"]);
 const MarginEnum = z.enum(["narrow", "normal", "wide"]);
@@ -121,47 +113,6 @@ function parseHeaders(): Record<string, string> | undefined {
   }
 }
 
-function parseCommandArgs(): string[] | undefined {
-  const raw = process.env.MARKDOWN2PDF_MCP_ARGS;
-  if (!raw) {
-    return undefined;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (Array.isArray(parsed)) {
-      return parsed.map((value) => String(value));
-    }
-  } catch {
-    // fall through
-  }
-
-  return raw
-    .split(/\s+/)
-    .map((value) => value.trim())
-    .filter(Boolean);
-}
-
-function parseCommandEnv(): Record<string, string> | undefined {
-  const raw = process.env.MARKDOWN2PDF_MCP_ENV;
-  if (!raw) {
-    return undefined;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    return Object.fromEntries(
-      Object.entries(parsed).map(([key, value]) => [key, String(value)]),
-    );
-  } catch (error) {
-    console.warn(
-      "[markdown2pdf] Failed to parse MARKDOWN2PDF_MCP_ENV as JSON. Expected object of env key/value pairs.",
-      error,
-    );
-    return undefined;
-  }
-}
-
 async function ensureOutputDirectory(): Promise<string> {
   if (resolvedOutputDir) {
     return resolvedOutputDir;
@@ -176,57 +127,25 @@ async function ensureOutputDirectory(): Promise<string> {
 }
 
 async function resolveServerDefinition(timeout: number): Promise<MastraMCPServerDefinition> {
-  const rawUrl = process.env.MARKDOWN2PDF_MCP_URL?.trim();
-  if (rawUrl) {
-    let url: URL;
-    try {
-      url = new URL(rawUrl);
-    } catch (error) {
-      throw new Error(
-        `Invalid MARKDOWN2PDF_MCP_URL value '${rawUrl}'. Provide a fully qualified URL (e.g. http://127.0.0.1:3002/mcp).`,
-        error instanceof Error ? { cause: error } : undefined,
-      );
-    }
+  const rawUrl =
+    process.env.MARKDOWN2PDF_MCP_URL?.trim() ?? DEFAULT_MARKDOWN2PDF_URL;
 
-    const headers = parseHeaders();
-
-    return {
-      url,
-      timeout,
-      requestInit: headers ? { headers } : undefined,
-    };
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch (error) {
+    throw new Error(
+      `Invalid MARKDOWN2PDF_MCP_URL value '${rawUrl}'. Provide a fully qualified URL (e.g. http://127.0.0.1:3002/mcp).`,
+      error instanceof Error ? { cause: error } : undefined,
+    );
   }
 
-  let command = process.env.MARKDOWN2PDF_MCP_COMMAND?.trim() || DEFAULT_COMMAND;
-  const parsedArgs = parseCommandArgs();
-  let args =
-    parsedArgs && parsedArgs.length > 0 ? parsedArgs : DEFAULT_COMMAND_ARGS;
-
-  if (args === DEFAULT_COMMAND_ARGS) {
-    try {
-      await fs.access(DEFAULT_WRAPPER_SCRIPT);
-    } catch (error) {
-      console.warn(
-        "[markdown2pdf] Wrapper script missing; falling back to npx runner.",
-        error,
-      );
-      command = FALLBACK_COMMAND;
-      args = FALLBACK_ARGS;
-    }
-  }
-
-  const outputDir = await ensureOutputDirectory();
-  const extraEnv = parseCommandEnv();
+  const headers = parseHeaders();
 
   return {
-    command,
-    args,
-    env: {
-      ...process.env,
-      M2P_OUTPUT_DIR: outputDir,
-      ...(extraEnv ?? {}),
-    },
+    url,
     timeout,
+    requestInit: headers ? { headers } : undefined,
   };
 }
 
@@ -333,6 +252,8 @@ function extractPdfPath(log: string): { path: string; log: string } {
 
 async function invokePdfTool(input: GenerateResumePdfInput): Promise<GenerateResumePdfResult> {
   const normalized = normalizeInput(input);
+  const outputDir = await ensureOutputDirectory();
+  const desiredOutputPath = path.join(outputDir, normalized.fileName);
   const tools = await ensureTools();
   const tool = tools[PDF_MCP_TOOL_ID];
 
@@ -347,7 +268,7 @@ async function invokePdfTool(input: GenerateResumePdfInput): Promise<GenerateRes
     {
       context: {
         markdown: input.markdown,
-        outputFilename: normalized.fileName,
+        outputFilename: desiredOutputPath,
         paperFormat: normalized.pageSize,
         paperOrientation: normalized.orientation,
         paperBorder: mapMarginToBorder(normalized.margin),

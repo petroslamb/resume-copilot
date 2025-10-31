@@ -50,9 +50,6 @@ importers:
       libsql:
         specifier: ^0.5.22
         version: 0.5.22
-      markdown2pdf-mcp:
-        specifier: ^2.1.3
-        version: 2.1.3(typescript@5.9.3)
       mastra:
         specifier: 0.13.4
         version: 0.13.4(@mastra/core@0.19.1(openapi-types@12.1.3)(react@19.2.0)(zod@3.25.76))(@opentelemetry/api@1.9.0)(@types/json-schema@7.0.15)(typescript@5.9.3)(zod@3.25.76)
@@ -5664,10 +5661,6 @@ packages:
 
   markdown-table@3.0.4:
     resolution: {integrity: sha512-wiYz4+JrLyb/DqW2hkFJxP7Vd7JuTDm77fvbM8VfEQdmSMqcImWeeRbHwZjBjIFki/VaMK2BhFi7oUUZeM5bqw==}
-
-  markdown2pdf-mcp@2.1.3:
-    resolution: {integrity: sha512-a6AQqYDhduPPXa2F2Oi+6LAJufc52ksp9GbvdHMvrxvdZ++Q9KtVqnFB6VwRQbHKy2C6ITuF/yJgkLHz29/rZA==}
-    hasBin: true
 
   mastra@0.13.4:
     resolution: {integrity: sha512-p9abBTH65OgmZwQVDLkegikeuEg7kruKHOs9IKc2slrv83FcCXGevQDNMWa533iuAjEOE2ev85jcsZ+7ZSpKLA==}
@@ -14120,22 +14113,6 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.5
 
   markdown-table@3.0.4: {}
-
-  markdown2pdf-mcp@2.1.3(typescript@5.9.3):
-    dependencies:
-      '@modelcontextprotocol/sdk': 1.20.0
-      highlight.js: 10.7.3
-      puppeteer: 23.11.1(typescript@5.9.3)
-      remarkable: 2.0.1
-      tmp: 0.2.5
-    transitivePeerDependencies:
-      - bare-abort-controller
-      - bare-buffer
-      - bufferutil
-      - react-native-b4a
-      - supports-color
-      - typescript
-      - utf-8-validate
 
   mastra@0.13.4(@mastra/core@0.19.1(openapi-types@12.1.3)(react@19.2.0)(zod@3.25.76))(@opentelemetry/api@1.9.0)(@types/json-schema@7.0.15)(typescript@5.9.3)(zod@3.25.76):
     dependencies:

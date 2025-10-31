@@ -133,6 +133,29 @@ The agent exposes the remote `markitdown_convert_to_markdown` MCP tool so it can
 
 If the tool cannot be reached, the agent starts without it and logs a warning so you can correct the configuration.
 
+## Markdown2PDF MCP Integration
+
+Resume PDF export now expects an HTTP-accessible Markdown2PDF MCP server. Point the app at a reachable endpoint and the agent will call the `create_pdf_from_markdown` tool; otherwise PDF generation fails fast.
+
+### Quick start
+
+1. Launch the server (e.g. `markdown2pdf-mcp --stdio` behind an MCP HTTP bridge, or your hosted deployment).
+2. Expose it over HTTP and note the MCP endpoint URL (default the app looks for `http://127.0.0.1:3002/mcp`).
+3. Configure the app:
+   ```bash
+   export MARKDOWN2PDF_MCP_URL=http://127.0.0.1:3002/mcp
+   ```
+4. (Optional) Provide custom headers or timeouts via the environment variables below.
+
+### Configuration
+
+- `MARKDOWN2PDF_MCP_URL` – HTTP endpoint for the Markdown2PDF MCP server. Defaults to `http://127.0.0.1:3002/mcp`.
+- `MARKDOWN2PDF_MCP_HEADERS` – Optional JSON of additional HTTP headers.
+- `MARKDOWN2PDF_MCP_TIMEOUT` – Per-call timeout in milliseconds (default `120000`).
+- `MARKDOWN2PDF_OUTPUT_DIR` – Directory where generated PDFs are written before being streamed back. Defaults to `.cache/markdown2pdf` inside the app workspace; ensure the MCP server can write to and read from the same path.
+
+If the MCP endpoint is unreachable, the tool throws a descriptive error and the agent surfaces a PDF-generation failure to the UI.
+
 ## Containerization & Deployment
 
 ```bash

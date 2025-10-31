@@ -12,8 +12,7 @@
     "start:agent": "mastra start",
     "lint": "next lint",
     "build": "mastra build && next build",
-    "start": "concurrently \"npm:start:agent\" \"npm:start:ui\"",
-    "postinstall": "pnpm dlx puppeteer@23.11.1 browsers install chrome@131.0.6778.204"
+    "start": "concurrently \"npm:start:agent\" \"npm:start:ui\""
   },
   "dependencies": {
     "@ag-ui/mastra": "0.1.0",
@@ -30,7 +29,6 @@
     "@mastra/memory": "0.15.4",
     "dotenv": "^17.2.3",
     "libsql": "^0.5.22",
-    "markdown2pdf-mcp": "^2.1.3",
     "mastra": "0.13.4",
     "next": ">=15.5.4",
     "ollama-ai-provider-v2": "^1.5.0",
