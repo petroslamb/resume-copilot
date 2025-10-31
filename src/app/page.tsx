@@ -27,6 +27,15 @@ const markdownResumeTemplate = `# Resume Snapshot
 
 - `;
 
+type PdfLayoutOptions = {
+  pageSize: "letter" | "a4" | "a3" | "a5" | "legal" | "tabloid";
+  margin: "normal" | "narrow" | "wide";
+  orientation: "portrait" | "landscape";
+  showPageNumbers: boolean;
+  watermark: string;
+  watermarkScope: "all-pages" | "first-page";
+};
+
 function sanitizeMarkdownPayload(input: string): string {
   const trimmed = input.trim();
   if (!trimmed.startsWith("```")) {
@@ -88,6 +97,17 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
   const [isFormatting, setIsFormatting] = useState(false);
   const [formattingStatus, setFormattingStatus] = useState<string | null>(null);
   const [formattingError, setFormattingError] = useState<string | null>(null);
+  const [pdfOptions, setPdfOptions] = useState<PdfLayoutOptions>({
+    pageSize: "letter",
+    margin: "normal",
+    orientation: "portrait",
+    showPageNumbers: false,
+    watermark: "",
+    watermarkScope: "all-pages",
+  });
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [pdfStatus, setPdfStatus] = useState<string | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
   const applyResumeUpdate = useCallback(
     (nextMarkdown: string) => {
       setAgentState((prev) => {
@@ -170,6 +190,124 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
     }
   }, [applyResumeUpdate, isFormatting, markdownResume]);
 
+  const updatePdfOption = useCallback(
+    (key: keyof PdfLayoutOptions, value: PdfLayoutOptions[keyof PdfLayoutOptions]) => {
+      setPdfOptions((prev) => {
+        if (prev[key] === value) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          [key]: value,
+        };
+      });
+    },
+    [],
+  );
+
+  const handleWatermarkChange = useCallback((value: string) => {
+    const sanitized = value.toUpperCase().replace(/[^A-Z0-9 -]/g, "").slice(0, 15);
+    setPdfOptions((prev) => {
+      if (prev.watermark === sanitized) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        watermark: sanitized,
+      };
+    });
+  }, []);
+
+  const handleDownloadPdf = useCallback(async () => {
+    setIsGeneratingPdf(true);
+    setPdfStatus(null);
+    setPdfError(null);
+
+    try {
+      const watermarkValue = pdfOptions.watermark.trim();
+      const requestPayload = {
+        markdown: markdownResume,
+        pageSize: pdfOptions.pageSize,
+        margin: pdfOptions.margin,
+        orientation: pdfOptions.orientation,
+        showPageNumbers: pdfOptions.showPageNumbers,
+        watermark: watermarkValue ? watermarkValue : undefined,
+        watermarkScope: watermarkValue ? pdfOptions.watermarkScope : undefined,
+      };
+
+      const response = await fetch("/api/resume-pdf", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestPayload),
+      });
+
+      const payload = (await response.json()) as {
+        pdfBase64?: string;
+        fileName?: string;
+        contentType?: string;
+        layout?: {
+          pageSize: PdfLayoutOptions["pageSize"];
+          margin: PdfLayoutOptions["margin"];
+          orientation: PdfLayoutOptions["orientation"];
+          showPageNumbers: boolean;
+          watermark?: string;
+          watermarkScope?: PdfLayoutOptions["watermarkScope"];
+        };
+        log?: string;
+        error?: string;
+      };
+
+      if (!response.ok || typeof payload.pdfBase64 !== "string" || !payload.fileName) {
+        throw new Error(payload.error || "PDF generator returned an unexpected response.");
+      }
+
+      const binary = window.atob(payload.pdfBase64);
+      const buffer = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) {
+        buffer[index] = binary.charCodeAt(index);
+      }
+
+      const blob = new Blob([buffer], {
+        type: payload.contentType || "application/pdf",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = payload.fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      const layoutSummary = payload.layout
+        ? [
+            payload.layout.pageSize.toUpperCase(),
+            payload.layout.orientation === "landscape" ? "Landscape" : "Portrait",
+            `${payload.layout.margin} margin`,
+            payload.layout.showPageNumbers ? "Page numbers" : null,
+            payload.layout.watermark ? `Watermark (${payload.layout.watermarkScope})` : null,
+          ]
+            .filter(Boolean)
+            .join(" • ")
+        : undefined;
+      setPdfStatus(
+        layoutSummary
+          ? `Downloaded ${payload.fileName} (${layoutSummary}).`
+          : `Downloaded ${payload.fileName}.`,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to generate the resume PDF.";
+      setPdfError(message);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  }, [markdownResume, pdfOptions]);
+
   useCopilotReadable(
     {
       description: "Markdown resume template content",
@@ -247,6 +385,13 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
           improvingFormatting={isFormatting}
           formattingStatus={formattingStatus}
           formattingError={formattingError}
+          pdfOptions={pdfOptions}
+          onPdfOptionChange={updatePdfOption}
+          onWatermarkChange={handleWatermarkChange}
+          onDownloadPdf={handleDownloadPdf}
+          downloadingPdf={isGeneratingPdf}
+          pdfStatus={pdfStatus}
+          pdfError={pdfError}
         />
         {viewMode === "edit" && (
           <MarkitdownImportCard
@@ -282,6 +427,13 @@ function MarkdownResumePanel({
   improvingFormatting,
   formattingStatus,
   formattingError,
+  pdfOptions,
+  onPdfOptionChange,
+  onWatermarkChange,
+  onDownloadPdf,
+  downloadingPdf,
+  pdfStatus,
+  pdfError,
 }: {
   markdown: string;
   themeColor: string;
@@ -295,6 +447,16 @@ function MarkdownResumePanel({
   improvingFormatting: boolean;
   formattingStatus: string | null;
   formattingError: string | null;
+  pdfOptions: PdfLayoutOptions;
+  onPdfOptionChange: (
+    key: keyof PdfLayoutOptions,
+    value: PdfLayoutOptions[keyof PdfLayoutOptions],
+  ) => void;
+  onWatermarkChange: (value: string) => void;
+  onDownloadPdf: () => void;
+  downloadingPdf: boolean;
+  pdfStatus: string | null;
+  pdfError: string | null;
 }) {
   const previewElements = renderMarkdown(mode === "edit" ? draftMarkdown : markdown);
 
@@ -318,29 +480,158 @@ function MarkdownResumePanel({
                 : "Adjust the markdown directly. Save changes to update the live preview and share with the copilot."}
             </p>
           </div>
-          <div className="flex flex-col items-start gap-2 md:items-end">
+          <div className="flex w-full flex-col items-start gap-3 md:w-auto md:items-end">
             {mode === "preview" && (
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={onImproveFormatting}
-                  disabled={improvingFormatting}
-                  className="rounded-full border border-white/30 px-4 py-2 text-sm font-medium text-white/80 transition-colors hover:text-white disabled:opacity-60"
-                >
-                  {improvingFormatting ? "Formatting…" : "Improve Formatting"}
-                </button>
-                <button
-                  type="button"
-                  onClick={onEnterEditMode}
-                  className="rounded-full border px-4 py-2 text-sm font-medium text-white transition-colors"
-                  style={{
-                    borderColor: themeColor,
-                    backgroundColor: themeColor,
-                  }}
-                >
-                  Edit Resume
-                </button>
-              </div>
+              <>
+                <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center md:justify-end md:gap-3">
+                  <button
+                    type="button"
+                    onClick={onImproveFormatting}
+                    disabled={improvingFormatting}
+                    className="rounded-full border border-white/30 px-4 py-2 text-sm font-medium text-white/80 transition-colors hover:text-white disabled:opacity-60"
+                  >
+                    {improvingFormatting ? "Formatting…" : "Improve Formatting"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onEnterEditMode}
+                    className="rounded-full border px-4 py-2 text-sm font-medium text-white transition-colors"
+                    style={{
+                      borderColor: themeColor,
+                      backgroundColor: themeColor,
+                    }}
+                  >
+                    Edit Resume
+                  </button>
+                </div>
+                <div className="flex w-full flex-col gap-2 md:items-end">
+                  <button
+                    type="button"
+                    onClick={onDownloadPdf}
+                    disabled={downloadingPdf}
+                    className="rounded-full border px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-60"
+                    style={{
+                      borderColor: themeColor,
+                      backgroundColor: downloadingPdf ? "transparent" : themeColor,
+                      color: downloadingPdf ? "rgba(255,255,255,0.8)" : "#ffffff",
+                    }}
+                  >
+                    {downloadingPdf ? "Generating PDF…" : "Download PDF"}
+                  </button>
+                  <div className="grid w-full grid-cols-1 gap-3 text-xs text-white/80 md:w-[26rem] md:grid-cols-2">
+                    <label className="flex flex-col gap-1">
+                      <span className="uppercase tracking-[0.2em] text-white/50">
+                        Page Size
+                      </span>
+                      <select
+                        value={pdfOptions.pageSize}
+                        onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                          onPdfOptionChange(
+                            "pageSize",
+                            event.target.value as PdfLayoutOptions["pageSize"],
+                          )
+                        }
+                        className="rounded-2xl border border-white/30 bg-slate-950/60 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+                      >
+                        <option value="letter">Letter</option>
+                        <option value="a4">A4</option>
+                        <option value="legal">Legal</option>
+                        <option value="a3">A3</option>
+                        <option value="a5">A5</option>
+                        <option value="tabloid">Tabloid</option>
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="uppercase tracking-[0.2em] text-white/50">
+                        Orientation
+                      </span>
+                      <select
+                        value={pdfOptions.orientation}
+                        onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                          onPdfOptionChange(
+                            "orientation",
+                            event.target.value as PdfLayoutOptions["orientation"],
+                          )
+                        }
+                        className="rounded-2xl border border-white/30 bg-slate-950/60 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+                      >
+                        <option value="portrait">Portrait</option>
+                        <option value="landscape">Landscape</option>
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="uppercase tracking-[0.2em] text-white/50">
+                        Margins
+                      </span>
+                      <select
+                        value={pdfOptions.margin}
+                        onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                          onPdfOptionChange(
+                            "margin",
+                            event.target.value as PdfLayoutOptions["margin"],
+                          )
+                        }
+                        className="rounded-2xl border border-white/30 bg-slate-950/60 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+                      >
+                        <option value="normal">Normal</option>
+                        <option value="narrow">Narrow</option>
+                        <option value="wide">Wide</option>
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="uppercase tracking-[0.2em] text-white/50">
+                        Page Numbers
+                      </span>
+                      <div className="rounded-2xl border border-white/30 bg-slate-950/60 px-3 py-2">
+                        <label className="flex items-center gap-2 text-white/80">
+                          <input
+                            type="checkbox"
+                            checked={pdfOptions.showPageNumbers}
+                            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                              onPdfOptionChange("showPageNumbers", event.target.checked)
+                            }
+                            className="h-4 w-4 accent-current"
+                          />
+                          <span>Show footer page numbers</span>
+                        </label>
+                      </div>
+                    </label>
+                    <label className="flex flex-col gap-1 md:col-span-2">
+                      <span className="uppercase tracking-[0.2em] text-white/50">
+                        Watermark
+                      </span>
+                      <input
+                        type="text"
+                        value={pdfOptions.watermark}
+                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                          onWatermarkChange(event.target.value)
+                        }
+                        placeholder="Optional (max 15 characters)"
+                        className="rounded-2xl border border-white/30 bg-slate-950/60 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 md:col-span-2">
+                      <span className="uppercase tracking-[0.2em] text-white/50">
+                        Watermark Scope
+                      </span>
+                      <select
+                        value={pdfOptions.watermarkScope}
+                        onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                          onPdfOptionChange(
+                            "watermarkScope",
+                            event.target.value as PdfLayoutOptions["watermarkScope"],
+                          )
+                        }
+                        disabled={pdfOptions.watermark.trim().length === 0}
+                        className="rounded-2xl border border-white/30 bg-slate-950/60 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-white/30 disabled:opacity-60"
+                      >
+                        <option value="all-pages">All Pages</option>
+                        <option value="first-page">First Page Only</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              </>
             )}
             {mode === "edit" && (
               <>
@@ -364,14 +655,17 @@ function MarkdownResumePanel({
                 </button>
               </>
             )}
-            {mode === "preview" && (formattingStatus || formattingError) && (
-              <p
-                className={`text-xs ${
-                  formattingError ? "text-rose-300" : "text-emerald-300"
-                }`}
-              >
-                {formattingError ?? formattingStatus}
-              </p>
+            {mode === "preview" && (
+              <div className="flex w-full flex-col gap-1 md:items-end">
+                {formattingError && <p className="text-xs text-rose-300">{formattingError}</p>}
+                {!formattingError && formattingStatus && (
+                  <p className="text-xs text-emerald-300">{formattingStatus}</p>
+                )}
+                {pdfError && <p className="text-xs text-rose-300">{pdfError}</p>}
+                {!pdfError && pdfStatus && (
+                  <p className="text-xs text-emerald-300">{pdfStatus}</p>
+                )}
+              </div>
             )}
           </div>
         </div>

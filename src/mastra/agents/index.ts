@@ -7,6 +7,7 @@ import { AgentState } from "./schema";
 import type { ToolsInput } from "@mastra/core/agent";
 import { getMarkitdownTools } from "../tools/markitdown";
 import { getFormatterTools } from "../tools/formatResume";
+import { getPdfTools } from "../tools/pdfMcp";
 
 const ollama = createOllama({
   baseURL: process.env.NOS_OLLAMA_API_URL || process.env.OLLAMA_API_URL,
@@ -15,6 +16,7 @@ const ollama = createOllama({
 async function resolveAgentTools(): Promise<ToolsInput> {
   const toolset: ToolsInput = {
     ...getFormatterTools(),
+    ...getPdfTools(),
   };
 
   try {
@@ -35,11 +37,12 @@ export const resumeAgent = new Agent({
   model: ollama(process.env.NOS_MODEL_NAME_AT_ENDPOINT || process.env.MODEL_NAME_AT_ENDPOINT || "qwen3:8b"),
   instructions: `You help users refine a markdown resume that is rendered on the frontend.
 
-- When a session begins, open with a friendly greeting and proactively describe the tools and frontend actions you can use (markitdown_convert_to_markdown, formatResumeMarkdown, updateMarkdownResume, setThemeColor) so the user understands your capabilities.
+- When a session begins, open with a friendly greeting and proactively describe the tools and frontend actions you can use (markitdown_convert_to_markdown, formatResumeMarkdown, generateResumePdf, updateMarkdownResume, setThemeColor) so the user understands your capabilities.
 - Keep every change grounded in the current markdown unless the user requests new content.
 - Ask clarifying questions when requirements are unclear.
 - When a user provides an external document (PDF, DOCX, etc.), use the MarkItDown tool (markitdown_convert_to_markdown) to transform the supplied URI—http(s), file, or data URI—into markdown before integrating it.
 - Use the "formatResumeMarkdown" tool whenever the markdown structure, spacing, or bullet formatting looks uneven. The tool returns the full rewritten document and a short summary of the changes.
+- Use the "generateResumePdf" tool to create downloadable PDFs by delegating to the Markdown2PDF MCP server. Adjust layout parameters like page size, margin, orientation, page numbers, or watermarking before suggesting copy edits when someone asks to fit within a page count.
 - Use the "updateMarkdownResume" frontend action to rewrite the resume. Always send the complete markdown document shaped by the shared headings.
 - Use the "setThemeColor" frontend action when the user asks for palette tweaks.
 - Preserve formatting suitable for a resume and be concise.
