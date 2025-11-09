@@ -55,6 +55,7 @@ export default function CopilotKitPage() {
 
   useCopilotAction({
     name: "setThemeColor",
+    available: "remote",
     parameters: [
       {
         name: "themeColor",
@@ -76,6 +77,7 @@ export default function CopilotKitPage() {
       <CopilotSidebar
         clickOutsideToClose={false}
         defaultOpen={true}
+        suggestions="manual"
         labels={{
           title: "Resume Copilot",
           initial:
@@ -393,6 +395,7 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
 
   useCopilotAction({
     name: "updateMarkdownResume",
+    available: "remote",
     description:
       "Replace the markdown resume document shown in the preview panel. Always send the complete markdown string shaped by the shared headings.",
     parameters: [

@@ -8,7 +8,7 @@
     {
       "id": "agents",
       "args": {
-        "image": "djmbritt/agent-challenge:latest",
+        "image": "petroslamb/resume-copilot:latest",
         "expose": 3000,
         "env": {
           "NOS_OLLAMA_API_URL": "http://%%ops.ollama.host%%:11434/api",

@@ -73,8 +73,8 @@ Key goals:
 ## Installation
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/agent-challenge.git
-cd agent-challenge
+git clone https://github.com/YOUR-USERNAME/resume-copilot.git
+cd resume-copilot
 cp .env.example .env     # set NOS_OLLAMA_API_URL / MODEL_NAME_AT_ENDPOINT / etc.
 pnpm install
 ```
@@ -86,7 +86,7 @@ Update `.env` with one of the following:
   - `NOS_OLLAMA_API_URL` from the challenge brief (endpoint already appends `/api`).
   - `NOS_MODEL_NAME_AT_ENDPOINT=qwen3:8b`
 - **Local Ollama:** run `ollama serve`, set `OLLAMA_API_URL=http://127.0.0.1:11434/api`, and pick a model name (e.g. `MODEL_NAME_AT_ENDPOINT=qwen3:0.6b`).
-- **OpenAI:** `pnpm add @ai-sdk/openai`, set `OPENAI_API_KEY`, and update the agent model in `src/mastra/agents/index.ts`.
+- **OpenAI:** set `OPENAI_API_KEY` (plus optional `OPENAI_MODEL`, `OPENAI_BASE_URL`) and the agent will automatically route to OpenAI.
 
 ## Running Locally
 
@@ -166,14 +166,14 @@ If the MCP endpoint is unreachable, the tool returns the markdown content alongs
 
 ```bash
 # Build the production image
-docker build -t yourusername/agent-challenge:latest .
+docker build -t yourusername/resume-copilot:latest .
 
 # Smoke-test locally
-docker run -p 3000:3000 yourusername/agent-challenge:latest
+docker run -p 3000:3000 yourusername/resume-copilot:latest
 
 # Push to your registry of choice
 docker login
-docker push yourusername/agent-challenge:latest
+docker push yourusername/resume-copilot:latest
 ```
 
 The Dockerfile runs the Mastra agent and Next.js UI inside a single container, mirroring the environment expected by Nosana job definitions (`nos_job_def/`).
@@ -181,7 +181,7 @@ The Dockerfile runs the Mastra agent and Next.js UI inside a single container, m
 ## Submitting to the Challenge
 
 1. **Register** for the Builders' Challenge via [SuperTeam](https://earn.superteam.fun/listing/nosana-builders-challenge-agents-102) and the [Luma page](https://luma.com/zkob1iae).
-2. **Star** the required repositories (agent-challenge starter, Nosana CLI, Nosana SDK).
+2. **Star** the required repositories (resume-copilot starter, Nosana CLI, Nosana SDK).
 3. **Build & Tag** your Docker image and push it to Docker Hub (or another container registry supported by Nosana).
 4. **Deploy on Nosana:** use the job definitions in `nos_job_def/` or your custom workflow to run the image on Nosana's decentralized network.
 5. **Verify the deployment:** capture the live URL or a short screen recording showing the deployed Resume Copilot in action.

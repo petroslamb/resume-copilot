@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { Agent } from "@mastra/core/agent";
+import { createOpenAI } from "@ai-sdk/openai";
 import { createOllama } from "ollama-ai-provider-v2";
 import { Memory } from "@mastra/memory";
 import { LibSQLStore } from "@mastra/libsql";
@@ -12,6 +13,30 @@ import { getPdfTools } from "../tools/pdfMcp";
 const ollama = createOllama({
   baseURL: process.env.NOS_OLLAMA_API_URL || process.env.OLLAMA_API_URL,
 });
+
+const openAIKey = process.env.OPENAI_API_KEY;
+const openai = openAIKey
+  ? createOpenAI({
+      apiKey: openAIKey,
+      baseURL: process.env.OPENAI_BASE_URL,
+      organization: process.env.OPENAI_ORG,
+      project: process.env.OPENAI_PROJECT,
+    })
+  : null;
+
+const resolveModel = () => {
+  if (openai) {
+    return openai.chat(process.env.OPENAI_MODEL || "gpt-4o-mini");
+  }
+
+  if (!process.env.NOS_OLLAMA_API_URL && !process.env.OLLAMA_API_URL) {
+    throw new Error(
+      "No LLM provider configured. Set OPENAI_API_KEY or provide NOS_OLLAMA_API_URL / OLLAMA_API_URL.",
+    );
+  }
+
+  return ollama(process.env.NOS_MODEL_NAME_AT_ENDPOINT || process.env.MODEL_NAME_AT_ENDPOINT || "qwen3:8b");
+};
 
 async function resolveAgentTools(): Promise<ToolsInput> {
   const toolset: ToolsInput = {
@@ -33,7 +58,7 @@ async function resolveAgentTools(): Promise<ToolsInput> {
 export const resumeAgent = new Agent({
   name: "Resume Editor",
   tools: resolveAgentTools,
-  model: ollama(process.env.NOS_MODEL_NAME_AT_ENDPOINT || process.env.MODEL_NAME_AT_ENDPOINT || "qwen3:8b"),
+  model: resolveModel(),
   instructions: `You help users refine a markdown resume that is rendered on the frontend.
 
 - When a session begins, open with a friendly greeting and proactively describe the tools and frontend actions you can use (markitdown_convert_to_markdown, formatResumeMarkdown, generateResumePdf, updateMarkdownResume, setThemeColor) so the user understands your capabilities.
