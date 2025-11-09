@@ -29,10 +29,10 @@
 - Write imperative, present-tense commit subjects (e.g., “Handle malformed resume updates”).
 - Keep descriptions focused on the “why” and mention affected modules; group breaking schema changes in dedicated commits.
 - Pull Requests should include: summary of changes, test evidence (lint/build logs), updated screenshots for UI shifts, and deployment notes when relevant.
-- Reference related issues or challenge tasks, and call out schema or instruction changes that downstream agents must absorb.
+- Reference related issues or roadmap tasks, and call out schema or instruction changes that downstream agents must absorb.
 
 ## Agent-Specific Instructions
-- The primary agent is `resumeAgent` in `src/mastra/agents/index.ts`; changes here should be mirrored in `README.md` so challenge reviewers understand capabilities.
+- The primary agent is `resumeAgent` in `src/mastra/agents/index.ts`; changes here should be mirrored in `README.md` so contributors and users understand capabilities.
 - When adding new actions or tools, document their shape in the front-end action definition and update the agent instructions to reflect expected usage.
 - Preserve graceful handling of malformed payloads—use shared utilities in `page.tsx` and extend them rather than bypassing validation.
 - The agent greets on startup and immediately summarizes its available tools (`markitdown_convert_to_markdown`, `formatResumeMarkdown`, `updateMarkdownResume`, `setThemeColor`) so users know how to engage with it.
