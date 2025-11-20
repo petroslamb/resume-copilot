@@ -183,3 +183,6 @@ The Dockerfile runs the Mastra agent and Next.js UI inside a single container, m
 ## Project History
 
 Resume Copilot started life during Nosana & Mastra's Builders' Challenge #3 as an experiment in agentic resume editing. After the challenge wrapped, the codebase kept maturing—new MCP integrations, formatter tooling, UI polish, and deployment scripts were added so the project could stand on its own. Contributions now focus on long-lived career tooling, portability, and community-driven improvements.
+
+## LLM Provider Configuration
+To run this project, you need to configure an LLM provider. Set the  environment variable with your OpenAI API key. Alternatively, you can configure  or  for Ollama.
